@@ -1,0 +1,28 @@
+# Configuração do Render. Com este arquivo no repositório, o Render lê tudo
+# sozinho — não precisa preencher nada na mão no painel.
+#
+# `plan: free` dorme depois de 15 min sem ninguém e o disco é apagado a cada
+# redeploy, o que significa que as CONTAS SOMEM. Serve pra testar.
+# Pra valer, troque por um plano pago e descomente o bloco `disk` abaixo.
+
+services:
+  - type: web
+    name: projeto-sem-nome
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT --forwarded-allow-ips '*'
+    healthCheckPath: /entrar
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      # Aponta o banco pro disco persistente. Só faz efeito com o disco abaixo.
+      # - key: DB_PATH
+      #   value: /var/dados/dados.sqlite3
+
+    # Disco que sobrevive a redeploy. Exige plano pago.
+    # disk:
+    #   name: dados
+    #   mountPath: /var/dados
+    #   sizeGB: 1

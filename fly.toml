@@ -1,0 +1,40 @@
+# Configuração do Fly.io.
+#
+# Trocar "projeto-sem-nome" pelo nome que você registrar (tem que ser único
+# no Fly inteiro). O `fly launch` faz isso sozinho na primeira vez.
+
+app = "projeto-sem-nome"
+primary_region = "gru"   # São Paulo — menos latência pra galera daqui
+
+[build]
+
+[env]
+  DB_PATH = "/data/dados.sqlite3"
+
+# O disco que guarda as contas. Sem ele, todo deploy apaga apelido, senha,
+# boneco e guarda-roupa de todo mundo.
+[[mounts]]
+  source = "dados"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+  # Dorme quando não tem ninguém e acorda no primeiro acesso. Economiza,
+  # ao custo de ~2s de espera pra quem chega primeiro na noite.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  # WebSocket é conexão longa. Uma máquina só evita o problema de dois
+  # usuários da mesma sala caírem em servidores diferentes, que não
+  # enxergariam um ao outro (o estado da sala mora na memória).
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 60
+    soft_limit = 40
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

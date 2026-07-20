@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sala</title>
+<link rel="stylesheet" href="/css/y2k.css">
+<style>
+  body { padding: 8px; display: flex; }
+  .tela { display: flex; gap: 8px; width: 100%; height: 100%; }
+  .esquerda { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .direita { width: 260px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .direita .win:first-child { flex: 1; min-height: 0; }
+  .corpo.semfolga { padding: 0; display: flex; flex-direction: column; }
+  #dizer { flex: 1; min-width: 0; }
+  .barra {
+    flex: none; padding: 5px 8px; font-size: 11px;
+    border-top: 1px solid var(--sombra);
+    display: flex; gap: 10px; align-items: center;
+  }
+  #status { margin-left: auto; font-weight: bold; }
+  #status.on { color: #060; }
+  #status.off { color: #a00; }
+  #lista { padding: 6px 8px; font-size: 12px; overflow-y: auto; }
+  #lista div { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+  #lista canvas { image-rendering: pixelated; flex: none; }
+  .dica {
+    position: absolute; left: 10px; top: 8px;
+    background: rgba(0,0,0,.55); color: #fff;
+    font-size: 11px; padding: 4px 8px; pointer-events: none;
+  }
+  /* z acima de qualquer boneco (o maior que eles chegam é ~1000) */
+  #painel { position: absolute; right: 12px; top: 12px; width: 200px; z-index: 2000; }
+  #painel .corpo { padding: 8px 10px 10px; }
+</style>
+</head>
+<body>
+
+<div class="tela">
+  <!-- ---------------- sala ---------------- -->
+  <div class="esquerda">
+    <div class="win" style="flex:1; min-height:0;">
+      <div class="tbar">
+        <span class="t" id="titulo">■ sala</span>
+        <span class="b" id="editar" title="mudar apelido e boneco"
+              style="cursor:pointer; width:auto; padding:0 7px;">boneco</span>
+        <span class="b" id="sair" title="sair da sala" style="cursor:pointer;">✕</span>
+      </div>
+      <div class="corpo semfolga">
+        <div id="chao">
+          <div class="dica">setas ou WASD pra andar &nbsp;·&nbsp; clique no chão pra ir até lá</div>
+
+          <!-- painel de editar o boneco, flutuando sobre a sala -->
+          <div class="win" id="painel" hidden>
+            <div class="tbar">
+              <span class="t">■ seu boneco</span>
+              <span class="b" id="fechar-painel" style="cursor:pointer;">✕</span>
+            </div>
+            <div class="corpo">
+              <div id="editor"></div>
+              <p class="dim" style="font-size:11px; margin-top:8px;">
+                Muda na hora pra todo mundo da sala.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="barra">
+          <span id="contagem" class="dim">—</span>
+          <span id="status" class="off">conectando...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------------- chat ---------------- -->
+  <div class="direita">
+    <div class="win">
+      <div class="tbar"><span class="t">■ conversa</span></div>
+      <div class="corpo semfolga">
+        <div id="chatlog"></div>
+        <div class="linha" style="padding:5px; flex:none;">
+          <input type="text" id="dizer" maxlength="300" placeholder="digite e dê enter" autocomplete="off">
+          <button id="enviar" style="padding:4px 10px;">▶</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="win" style="flex:none; max-height:190px;">
+      <div class="tbar"><span class="t">■ quem tá aqui</span></div>
+      <div class="corpo semfolga">
+        <div id="lista"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/js/sala.js"></script>
+</body>
+</html>

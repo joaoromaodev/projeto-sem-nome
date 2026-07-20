@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>entrar — projeto sem nome</title>
+<link rel="stylesheet" href="/css/y2k.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto; }
+  .janela { width: 340px; max-width: 100%; }
+  .campo { margin-bottom: 10px; }
+  .campo label { display: block; font-weight: bold; margin-bottom: 3px; }
+  .campo input { width: 100%; }
+  .erro { color: #a00; font-size: 12px; min-height: 15px; margin-top: 2px; }
+  .principal { width: 100%; padding: 8px; margin-top: 4px; }
+  .troca { text-align: center; font-size: 12px; margin-top: 12px; }
+  .troca a { color: var(--navy); cursor: pointer; }
+  .subtitulo { font-size: 12px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<div class="win janela">
+  <div class="tbar">
+    <span class="t" id="tituloJanela">■ entrar.exe</span>
+    <span class="b">_</span><span class="b">□</span><span class="b">✕</span>
+  </div>
+  <div class="corpo">
+    <p class="subtitulo dim" id="subtitulo">Entre pra voltar pro seu boneco.</p>
+
+    <div class="campo">
+      <label for="nick">Apelido</label>
+      <input type="text" id="nick" maxlength="16" autocomplete="username">
+    </div>
+
+    <div class="campo">
+      <label for="senha">Senha</label>
+      <input type="password" id="senha" autocomplete="current-password">
+      <p class="dim" id="dicaSenha" style="font-size:11px; margin-top:3px;"></p>
+    </div>
+
+    <p class="erro" id="erro"></p>
+
+    <button class="principal" id="ok">Entrar</button>
+
+    <p class="troca">
+      <span id="trocaTexto">Não tem conta ainda?</span>
+      <a id="trocar">criar uma</a>
+    </p>
+  </div>
+</div>
+
+<script type="module">
+import { api } from "/js/api.js";
+import { avatarAleatorio } from "/js/avatar.js";
+
+const $ = (s) => document.querySelector(s);
+let modoCadastro = false;
+
+function pintarModo() {
+  $("#tituloJanela").textContent = modoCadastro ? "■ criar_conta.exe" : "■ entrar.exe";
+  $("#subtitulo").textContent = modoCadastro
+    ? "Escolha um apelido e uma senha. Seu boneco fica preso à conta."
+    : "Entre pra voltar pro seu boneco.";
+  $("#ok").textContent = modoCadastro ? "Criar conta" : "Entrar";
+  $("#trocaTexto").textContent = modoCadastro ? "Já tem conta?" : "Não tem conta ainda?";
+  $("#trocar").textContent = modoCadastro ? "entrar" : "criar uma";
+  $("#dicaSenha").textContent = modoCadastro ? "mínimo 6 caracteres" : "";
+  $("#senha").autocomplete = modoCadastro ? "new-password" : "current-password";
+  $("#erro").textContent = "";
+}
+
+$("#trocar").onclick = () => { modoCadastro = !modoCadastro; pintarModo(); $("#nick").focus(); };
+
+async function enviar() {
+  const nick = $("#nick").value.trim();
+  const senha = $("#senha").value;
+  $("#erro").textContent = "";
+
+  if (!nick) return ($("#erro").textContent = "falta o apelido");
+  if (!senha) return ($("#erro").textContent = "falta a senha");
+
+  $("#ok").disabled = true;
+  try {
+    if (modoCadastro) {
+      // já entra com um boneco sorteado, pra ninguém começar careca e cinza
+      await api.cadastrar(nick, senha, avatarAleatorio());
+    } else {
+      await api.entrar(nick, senha);
+    }
+    location.href = "/";
+  } catch (e) {
+    $("#erro").textContent = e.message;
+    $("#ok").disabled = false;
+  }
+}
+
+$("#ok").onclick = enviar;
+[$("#nick"), $("#senha")].forEach((el) =>
+  el.addEventListener("keydown", (e) => { if (e.key === "Enter") enviar(); }));
+
+pintarModo();
+$("#nick").focus();
+</script>
+</body>
+</html>

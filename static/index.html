@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>projeto sem nome</title>
+<link rel="stylesheet" href="/css/y2k.css">
+<style>
+  body { display: flex; align-items: center; justify-content: center; padding: 16px; overflow: auto; }
+  .janela { width: 620px; max-width: 100%; }
+  /* minmax(0,…) nas duas: sem isso um filho largo empurra a coluna
+     pra fora em vez de encolher. */
+  .grade {
+    display: grid; grid-template-columns: 238px minmax(0, 1fr);
+    gap: 16px; align-items: start;
+  }
+  .grade > * { min-width: 0; }
+  .campo { margin-bottom: 10px; }
+  .campo > label { display: block; font-weight: bold; margin-bottom: 3px; }
+  #sala { width: 100%; }
+  .aviso { font-size: 11px; margin-top: 3px; }
+  #entrar { width: 100%; padding: 8px; }
+  .recado { font-size: 11px; min-height: 14px; margin-top: 6px; }
+  .recado.ruim { color: #a00; }
+  .recado.bom { color: #060; }
+  .topo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .topo .quem { flex: 1; font-size: 12px; }
+  .topo button { padding: 3px 10px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<div class="win janela">
+  <div class="tbar">
+    <span class="t">■ projeto_sem_nome.exe</span>
+    <span class="b">_</span><span class="b">□</span><span class="b">✕</span>
+  </div>
+  <div class="corpo">
+
+    <div class="topo">
+      <span class="quem dim">conectado como <b id="quemSou">…</b></span>
+      <button id="sair">Sair da conta</button>
+    </div>
+
+    <div class="grade">
+      <fieldset>
+        <legend>Seu boneco</legend>
+        <div id="editor"></div>
+      </fieldset>
+
+      <div>
+        <div class="campo">
+          <label for="sala">Nome da sala</label>
+          <input type="text" id="sala" maxlength="32" placeholder="ex: quinta a noite" autocomplete="off">
+          <p class="dim aviso">
+            Quem digitar o mesmo nome cai na mesma sala.<br>
+            Combine um nome com a galera e usem sempre ele.
+          </p>
+        </div>
+
+        <button id="entrar">Entrar na sala &gt;</button>
+        <p class="recado" id="recado"></p>
+
+        <fieldset style="margin-top:14px;">
+          <legend>Trocar senha</legend>
+          <div class="campo">
+            <label for="senhaAtual">Senha atual</label>
+            <input type="password" id="senhaAtual" style="width:100%" autocomplete="current-password">
+          </div>
+          <div class="campo">
+            <label for="senhaNova">Senha nova</label>
+            <input type="password" id="senhaNova" style="width:100%" autocomplete="new-password">
+          </div>
+          <button id="trocarSenha" style="padding:4px 12px; font-size:12px;">Trocar</button>
+          <p class="recado" id="recadoSenha"></p>
+        </fieldset>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { api, adiar } from "/js/api.js";
+import { montarPainel } from "/js/editor.js";
+import { normalizar } from "/js/avatar.js";
+
+const $ = (s) => document.querySelector(s);
+
+const conta = await api.eu();
+const perfil = { nick: conta.nick, avatar: normalizar(conta.avatar) };
+$("#quemSou").textContent = conta.nick;
+
+function recado(el, txt, bom = false) {
+  el.textContent = txt;
+  el.className = "recado " + (bom ? "bom" : "ruim");
+  if (txt) setTimeout(() => { el.textContent = ""; }, 3500);
+}
+
+/* Grava com folga: o usuário fica clicando nas cores, não dá pra ir ao
+   servidor a cada clique. */
+const gravar = adiar(async () => {
+  try {
+    await api.salvarAvatar(perfil.avatar);
+    if (perfil.nick.trim() && perfil.nick.trim() !== conta.nick) {
+      const r = await api.trocarNick(perfil.nick.trim());
+      conta.nick = r.nick;
+      $("#quemSou").textContent = r.nick;
+    }
+  } catch (e) {
+    recado($("#recado"), e.message);
+  }
+}, 500);
+
+const painel = montarPainel($("#editor"), perfil, gravar, { px: 8, comNick: true });
+
+/* ---------- sala ---------- */
+$("#sala").value = localStorage.getItem("psn.ultimaSala") || "";
+
+function irParaSala() {
+  const sala = $("#sala").value.trim();
+  if (!sala) { $("#sala").focus(); return recado($("#recado"), "falta o nome da sala"); }
+  localStorage.setItem("psn.ultimaSala", sala);
+  location.href = "/sala/" + encodeURIComponent(sala);
+}
+
+$("#entrar").onclick = irParaSala;
+$("#sala").addEventListener("keydown", (e) => { if (e.key === "Enter") irParaSala(); });
+
+/* ---------- conta ---------- */
+$("#sair").onclick = async () => {
+  await api.sair();
+  location.href = "/entrar";
+};
+
+$("#trocarSenha").onclick = async () => {
+  const atual = $("#senhaAtual").value;
+  const nova = $("#senhaNova").value;
+  if (!atual || !nova) return recado($("#recadoSenha"), "preencha os dois campos");
+  try {
+    await api.trocarSenha(atual, nova);
+    // trocar senha derruba todas as sessões, inclusive esta
+    recado($("#recadoSenha"), "senha trocada — entrando de novo...", true);
+    setTimeout(() => { location.href = "/entrar"; }, 1200);
+  } catch (e) {
+    recado($("#recadoSenha"), e.message);
+  }
+};
+</script>
+</body>
+</html>

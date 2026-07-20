@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Projeto Sem Nome — Deck</title>
+<style>
+  @page { size: 13.333in 7.5in; margin: 0; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: Tahoma, "MS Sans Serif", Verdana, sans-serif;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .slide {
+    width: 1280px; height: 720px;
+    background: #008080;
+    padding: 34px 40px;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+    display: flex; flex-direction: column;
+    justify-content: center;
+  }
+  .slide:last-child { page-break-after: auto; }
+
+  /* ---------- Win98 chrome ---------- */
+  .win {
+    background: #c0c0c0;
+    border: 2px solid;
+    border-color: #dfdfdf #000 #000 #dfdfdf;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff, 3px 3px 0 rgba(0,0,0,.35);
+    display: flex; flex-direction: column;
+  }
+  .win.grow { width: 100%; }
+  .win.tall { flex: 1; min-height: 0; }
+
+  .tbar {
+    background: linear-gradient(90deg, #000080 0%, #1084d0 100%);
+    color: #fff; font-size: 15px; font-weight: bold;
+    padding: 4px 5px 4px 8px;
+    display: flex; align-items: center; gap: 8px;
+    margin: 2px 2px 0 2px;
+    letter-spacing: .2px;
+  }
+  .tbar .t { flex: 1; }
+  .tbar .btns { display: flex; gap: 3px; }
+  .tbar .b {
+    width: 20px; height: 18px; background: #c0c0c0; color: #000;
+    border: 1px solid; border-color: #fff #000 #000 #fff;
+    font-size: 11px; font-weight: bold; line-height: 15px; text-align: center;
+    font-family: Marlett, Tahoma, sans-serif;
+  }
+  .body { padding: 16px 20px 18px; flex: 1; min-height: 0; }
+
+  .sunken {
+    background: #fff;
+    border: 2px solid; border-color: #808080 #fff #fff #808080;
+    box-shadow: inset 1px 1px 0 #000, inset -1px -1px 0 #dfdfdf;
+    padding: 14px 16px;
+  }
+
+  .btn {
+    display: inline-block; background: #c0c0c0; padding: 6px 16px;
+    border: 2px solid; border-color: #fff #000 #000 #fff;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #dfdfdf;
+    font-size: 15px; font-weight: bold;
+  }
+
+  /* ---------- typography ---------- */
+  h1 { font-size: 62px; letter-spacing: -1.5px; line-height: 1; }
+  h2 { font-size: 34px; line-height: 1.1; margin-bottom: 14px; }
+  h3 { font-size: 19px; margin-bottom: 7px; }
+  p, li { font-size: 17px; line-height: 1.5; }
+  .lead { font-size: 21px; line-height: 1.45; }
+  .mono { font-family: "Courier New", monospace; }
+  .dim { color: #4a4a4a; }
+  .navy { color: #000080; }
+  .red { color: #a00; }
+  ul { list-style: none; }
+  li { padding-left: 22px; position: relative; margin-bottom: 9px; }
+  li:before { content: "\25B8"; position: absolute; left: 4px; color: #000080; font-size: 15px; }
+
+  .slideno {
+    position: absolute; right: 16px; bottom: 10px;
+    color: #4fb3b3; font-size: 12px; font-weight: bold;
+    font-family: "Courier New", monospace;
+  }
+
+  .cols { display: flex; gap: 16px; height: 100%; }
+  .cols > * { flex: 1; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  .card { background: #c0c0c0; border: 2px solid; border-color: #fff #808080 #808080 #fff; padding: 14px 16px; }
+  .card h3 { color: #000080; }
+  .card p { font-size: 15px; }
+
+  .tag {
+    display: inline-block; background: #000080; color: #fff;
+    font-size: 12px; font-weight: bold; padding: 3px 9px; letter-spacing: .4px;
+  }
+  .tag.g { background: #007000; }
+  .tag.r { background: #a00; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #c8c8c8; }
+  th { background: #c0c0c0; font-size: 13px; border-bottom: 2px solid #808080; }
+
+  .avwrap { display: flex; gap: 14px; align-items: flex-end; }
+  .av { image-rendering: pixelated; }
+
+  .roomdemo {
+    background: #6a8fbd; border: 2px solid; border-color: #808080 #fff #fff #808080;
+    position: relative; height: 100%; overflow: hidden;
+  }
+  .bubble {
+    position: absolute; background: #fff; border: 1px solid #000;
+    font-size: 12px; padding: 3px 7px; white-space: nowrap;
+  }
+  .charpos { position: absolute; text-align: center; }
+  .charpos .nm { font-size: 10px; font-weight: bold; color: #fff; text-shadow: 1px 1px 0 #000; margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ============ 1. CAPA ============ -->
+<div class="slide" style="justify-content:center; align-items:center;">
+  <div class="win" style="width: 860px;">
+    <div class="tbar"><span class="t">■ projeto_sem_nome.exe</span>
+      <span class="btns"><span class="b">_</span><span class="b">□</span><span class="b">✕</span></span></div>
+    <div class="body" style="text-align:center; padding: 40px 30px 34px;">
+      <div class="tag">EM DESENVOLVIMENTO &nbsp;·&nbsp; v0.1</div>
+      <h1 style="margin: 18px 0 6px;" class="navy">PROJETO<br>SEM NOME</h1>
+      <p class="lead" style="max-width:640px; margin: 14px auto 0;">
+        Um lugar pra gente assistir e ouvir as coisas <b>juntos</b> —
+        do jeito que a internet era mais divertida.
+      </p>
+      <div class="sunken mono" style="margin-top:26px; text-align:left; font-size:14px; background:#000; color:#0f0; border-color:#000;">
+        &gt; carregando salas...<br>
+        &gt; sincronizando amigos... <span style="background:#0f0; color:#000;">OK</span>
+      </div>
+      <div style="margin-top:24px;">
+        <span class="btn">Ver a ideia &gt;</span>
+      </div>
+    </div>
+  </div>
+  <div class="slideno">01</div>
+</div>
+
+<!-- ============ 2. A SAUDADE ============ -->
+<div class="slide">
+  <div class="win grow">
+    <div class="tbar"><span class="t">■ lembra_disso.txt</span>
+      <span class="btns"><span class="b">_</span><span class="b">□</span><span class="b">✕</span></span></div>
+    <div class="body">
+      <h2 class="navy">Lembra das salas de música do Transformice?</h2>
+      <div class="cols" style="height: 470px;">
+        <div class="sunken">
+          <p class="lead" style="margin-bottom:14px;">Não era só ouvir música.</p>
+          <p>Era <b>estar num lugar</b>. Ver os bonequinhos de todo mundo na tela.
+             Reconhecer quem sempre aparecia. A sala tinha nome, tinha gente, tinha história.</p>
+          <p style="margin-top:14px;">O mesmo do MSN: o barulhinho de alguém entrando,
+             o nick editado com símbolo, o avatar que dizia quem você era naquele mês.</p>
+          <p style="margin-top:18px;" class="red"><b>Hoje isso não existe mais.</b></p>
+          <p style="margin-top:6px;">A gente manda link de vídeo no grupo e cada um assiste sozinho,
+             no seu horário. Não é a mesma coisa e todo mundo sabe.</p>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div class="roomdemo" id="nostalgia"></div>
+          <div class="card" style="flex:none;">
+            <p style="font-size:15px;"><b>A pergunta do projeto:</b><br>
+            e se desse pra ter aquilo de volta, mas pra assistir qualquer coisa?</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slideno">02</div>
+</div>
+
+<!-- ============ 3. O QUE É ============ -->
+<div class="slide">
+  <div class="win grow">
+    <div class="tbar"><span class="t">■ o_que_e.exe</span>
+      <span class="btns"><span class="b">_</span><span class="b">□</span><span class="b">✕</span></span></div>
+    <div class="body">
+      <h2 class="navy">Uma sala na internet que é <i>nossa</i></h2>
+      <p class="lead dim" style="margin-bottom:18px;">Você entra, seus amigos estão lá, e vocês assistem a mesma coisa ao mesmo tempo.</p>
+      <div class="grid3" style="margin-bottom:16px;">
+        <div class="card">
+          <div class="tag">MÓDULO 01</div>
+          <h3 style="margin-top:10px;">▶ Toca-Fitas</h3>
+          <p>Fila de vídeos do YouTube tocando em sincronia perfeita. Alguém dá pause, pausa pra todo mundo.
+             Clipe, show, podcast, vídeo aleatório das 3 da manhã.</p>
+        </div>
+        <div class="card">
+          <div class="tag">MÓDULO 02</div>
+          <h3 style="margin-top:10px;">▣ Cine Privê</h3>
+          <p>Um de vocês compartilha a tela com áudio e a galera assiste junto.
+             Serve pra filme, série, ou pra ver alguém jogando.</p>
+        </div>
+        <div class="card">
+          <div class="tag">MÓDULO 03</div>
+          <h3 style="margin-top:10px;">✉ Chat + Avatares</h3>
+          <p>Chat estilo MSN na lateral e um bonequinho seu andando pela sala,
+             com balãozinho de fala sobre a cabeça.</p>
+        </div>
+      </div>
+      <div class="sunken" style="background:#ffffe1; border-color:#808080 #fff #fff #808080;">
+        <p><b>A diferença que importa:</b> a sala não morre quando vocês saem.
+           Ela continua lá com o mesmo endereço, o mesmo histórico e a mesma decoração —
+           igual servidor de jogo, não igual link de reunião.</p>
+      </div>
+    </div>
+  </div>
+  <div class="slideno">03</div>
+</div>
+
+<!-- ============ 4. A SALA (MOCKUP) ============ -->
+<div class="slide">
+  <div class="win grow tall">
+    <div class="tbar"><span class="t">■ sala :: quinta-a-noite &nbsp;—&nbsp; 5 online</span>
+      <span class="btns"><span class="b">_</span><span class="b">□</span><span class="b">✕</span></span></div>
+    <div class="body" style="padding:12px 14px;">
+      <div style="display:flex; gap:12px; height:100%;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:10px;">
+          <div class="sunken" style="flex:1; background:#111; border-color:#808080 #fff #fff #808080; display:flex; align-items:center; justify-content:center; padding:0;">
+            <div style="text-align:center; color:#fff;">
+              <div style="font-size:44px; color:#f00;">▶</div>
+              <p style="color:#fff; font-size:15px; margin-top:6px;">tocando agora</p>
+              <p class="mono" style="color:#0f0; font-size:13px;">02:14 ──────●──────── 04:31</p>
+            </div>
+          </div>
+          <div class="roomdemo" id="mainroom" style="height:200px; flex:none;"></div>
+        </div>
+        <div style="width:290px; display:flex; flex-direction:column; gap:10px;">
+          <div class="card" style="flex:none; padding:10px 12px;">
+            <h3 style="font-size:14px; margin-bottom:6px;">▤ FILA</h3>
+            <p style="font-size:12px; line-height:1.7;">
+              1. clipe que a Duda mandou<br>
+              2. aquele show de 2009<br>
+              3. vídeo do gato ⏎</p>
+          </div>
+          <div class="sunken" style="flex:1; font-size:12.5px; line-height:1.7; overflow:hidden;">
+            <p><b style="color:#a00;">Duda:</b> gente entra logo</p>
+            <p><b style="color:#00a;">Rafa:</b> to aqui já</p>
+            <p><b style="color:#070;">Bia:</b> quem pausou??</p>
+            <p><b style="color:#a00;">Duda:</b> kkkkk foi mal</p>
+            <p><b style="color:#808;">Léo:</b> bota o próximo</p>
+            <p style="color:#666;"><i>» Tiago entrou na sala</i></p>
+            <p><b style="color:#00a;">Rafa:</b> chegou o atrasado</p>
+          </div>
+          <div style="flex:none; display:flex; gap:5px;">
+            <div class="sunken" style="flex:1; padding:5px 7px; font-size:12px; color:#888;">digite...</div>
+            <span class="btn" style="padding:5px 11px; font-size:12px;">▶</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slideno">04</div>
+</div>
+
+<!-- ============ 5. AVATARES ============ -->
+<div class="slide">
+  <div class="win grow">
+    <div class="tbar"><span class="t">■ personalizar_avatar.exe</span>
+      <span class="btns"><span class="b">_</span><span class="b">□</span><span class="b">✕</span></span></div>
+    <div class="body">
+      <h2 class="navy">Seu bonequinho, sua cara</h2>
+      <div class="grid2" style="height:430px;">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div class="sunken" style="flex:none;">
+            <p class="lead">Cada um monta o seu: cabelo, roupa, cor, acessório.</p>
+            <p style="margin-top:10px;">Ele fica <b>andando pela sala</b> — você vê onde todo mundo está,
+              quem tá do seu lado, quem tá no cantinho. É o que faz parecer um lugar, e não um site.</p>
+          </div>
+          <div class="card" style="flex:1;">
+            <h3>Ideias pra depois</h3>
+            <ul style="margin-top:8px;">
+              <li>Acessórios que só liberam com tempo de sala</li>
+              <li>Itens de data específica (quem tava lá, tem)</li>
+              <li>Reações: dançar, aplaudir, dormir</li>
+              <li>Decorar a sala do grupo</li>
+              <li>Contador: "342 músicas ouvidas aqui"</li>
+            </ul>
+          </div>
+        </div>
+        <div class="sunken" style="display:flex; flex-direction:column;">
+          <p style="font-size:13px; font-weight:bold; margin-bottom:12px;">PRÉVIA &nbsp;—&nbsp; algumas combinações</p>
+          <div id="avgallery" style="display:grid; grid-template-columns:repeat(4,1fr); gap:14px; flex:1;"></div>
+          <p class="dim" style="font-size:13px; margin-top:12px; border-top:1px solid #ccc; padding-top:10px;">
+            Rascunho pra dar ideia — a arte final ainda vai ser escolhida.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slideno">05</div>
+</div>
+
+<!-- ============ 6. POR QUE NÃO OS OUTROS ============ -->
+<div class="slide">
+  <div class="win grow">
+    <div class="tbar"><span class="t">■ comparar.xls</span>
+      <span class="btns"><span class="b">_</span><span class="b">□</span><span class="b">✕</span></span></div>
+    <div class="body">
+      <h2 class="navy">"Mas já não existe isso?"</h2>
+      <p class="lead dim" style="margin-bottom:16px;">Existe — e é bom. Só que resolve outra coisa.</p>
+      <div class="sunken" style="padding:0;">
+        <table>
+          <tr><th style="width:24%">&nbsp;</th><th style="width:38%">Watch2Gether, Teleparty e afins</th><th style="width:38%">A ideia aqui</th></tr>
+          <tr><td><b>A sala</b></td><td class="dim">Descartável. Cria, manda link, acaba.</td><td><b>Fixa. Tem endereço próprio e continua existindo.</b></td></tr>
+          <tr><td><b>Quem tá lá</b></td><td class="dim">Nomes numa lista.</td><td><b>Bonequinhos que você vê andando.</b></td></tr>
+          <tr><td><b>Identidade</b></td><td class="dim">Nenhuma. Você é um nick.</td><td><b>Avatar montado por você.</b></td></tr>
+          <tr><td><b>Cara</b></td><td class="dim">Site branco, igual todo site.</td><td><b>Win98 / MSN / Winamp.</b></td></tr>
+          <tr><td><b>Serve pra</b></td><td class="dim">Um filme marcado com alguém.</td><td><b>Ter onde estar com a galera.</b></td></tr>
+        </table>
+      </div>
+      <div class="sunken" style="margin-top:16px; background:#ffffe1; border-color:#808080 #fff #fff #808080;">
+        <p>Resumindo: os outros são <b>uma ferramenta</b> pra ver um vídeo junto.
+           Esse é <b>um lugar</b> pra onde vocês voltam. É a diferença entre marcar reunião e ter um bar de sempre.</p>
+      </div>
+    </div>
+  </div>
+  <div class="slideno">06</div>
+</div>
+
+<!-- ============ 7. PLANO ============ -->
+<div class="slide">
+  <div class="win grow">
+    <div class="tbar"><span class="t">■ plano.txt</span>
+      <span class="btns"><span class="b">_</span><span class="b">□</span><span class="b">✕</span></span></div>
+    <div class="body">
+      <h2 class="navy">Como vai ser feito</h2>
+      <p class="lead dim" style="margin-bottom:18px;">Do mais simples pro mais complicado. Cada etapa já dá pra testar.</p>
+      <div class="grid2" style="gap:14px;">
+        <div class="card">
+          <div class="tag">ETAPA 1 &nbsp;·&nbsp; ~4 dias</div>
+          <h3 style="margin-top:10px;">Sala + chat funcionando</h3>
+          <p>Criar sala, entrar com apelido, conversar em tempo real. Feio, mas funcionando.</p>
+        </div>
+        <div class="card">
+          <div class="tag">ETAPA 2 &nbsp;·&nbsp; ~1 semana</div>
+          <h3 style="margin-top:10px;">YouTube em sincronia</h3>
+          <p>A parte difícil de verdade. Todo mundo no mesmo segundo do vídeo, sem travar.</p>
+        </div>
+        <div class="card">
+          <div class="tag">ETAPA 3 &nbsp;·&nbsp; ~5 dias</div>
+          <h3 style="margin-top:10px;">A cara Y2K + avatares</h3>
+          <p>Janelinhas, sons de MSN, bonequinhos andando pela sala. A parte divertida.</p>
+        </div>
+        <div class="card">
+          <div class="tag r">ETAPA 4 &nbsp;·&nbsp; ~2 semanas</div>
+          <h3 style="margin-top:10px;">Cine Privê (tela)</h3>
+          <p>Deixado por último de propósito: é a parte mais frágil e a que mais pode dar problema.</p>
+        </div>
+      </div>
+      <div class="sunken" style="margin-top:16px;">
+        <p><b>Primeira versão jogável em ~2 semanas.</b> A ideia é vocês testarem cedo e falarem o que tá ruim,
+           antes de eu construir coisa demais.</p>
+      </div>
+    </div>
+  </div>
+  <div class="slideno">07</div>
+</div>
+
+<!-- ============ 8. CUSTO + RISCOS ============ -->
+<div class="slide">
+  <div class="win grow">
+    <div class="tbar"><span class="t">■ custo_e_riscos.txt</span>
+      <span class="btns"><span class="b">_</span><span class="b">□</span><span class="b">✕</span></span></div>
+    <div class="body">
+      <div class="grid2" style="align-items:stretch;">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div class="sunken" style="flex:none; text-align:center; background:#000; border-color:#000;">
+            <p style="color:#0f0; font-size:15px;" class="mono">CUSTO PRA GENTE USAR</p>
+            <p style="color:#0f0; font-size:64px; font-weight:bold; line-height:1.1;" class="mono">R$ 0,00</p>
+          </div>
+          <div class="card" style="flex:1;">
+            <h3>Por quê</h3>
+            <ul style="margin-top:8px;">
+              <li>Roda no meu PC, aberto pra fora por um túnel gratuito</li>
+              <li>Chat e vídeo do YouTube gastam quase nada</li>
+              <li>A tela compartilhada vai direto de um PC pro outro</li>
+              <li>Se quiser deixar no ar 24h, tem servidor gratuito que dá conta</li>
+            </ul>
+            <p style="margin-top:12px; font-size:15px;" class="dim">Sem conta, sem cadastro, sem anúncio. Só um link.</p>
+          </div>
+        </div>
+        <div class="win" style="box-shadow:none; border-color:#dfdfdf #000 #000 #dfdfdf;">
+          <div class="tbar" style="background:linear-gradient(90deg,#7b0000 0%,#d04040 100%);">
+            <span class="t">⚠ o que pode dar errado</span></div>
+          <div class="body" style="padding:14px 16px;">
+            <p style="font-size:15px; margin-bottom:12px;" class="dim">Sendo honesto sobre os problemas:</p>
+            <ul>
+              <li><b>Tela compartilhada só funciona no PC</b> — Chrome ou Edge. No celular não rola, e no Safari é ruim.</li>
+              <li><b>Compartilhar tela aguenta umas 4 ou 5 pessoas.</b> Mais que isso trava.</li>
+              <li><b>Internet de alguns pode não deixar</b> conectar direto — é limitação da operadora, não do site.</li>
+              <li><b>Se ninguém voltar depois da primeira semana</b>, a ideia não funcionou. É isso que eu quero descobrir antes de fazer tudo.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="slideno">08</div>
+</div>
+
+<!-- ============ 9. O QUE EU PRECISO ============ -->
+<div class="slide" style="justify-content:center; align-items:center;">
+  <div class="win" style="width:920px;">
+    <div class="tbar"><span class="t">■ preciso_de_voces.exe</span>
+      <span class="btns"><span class="b">_</span><span class="b">□</span><span class="b">✕</span></span></div>
+    <div class="body" style="padding:30px 34px 28px;">
+      <h2 class="navy" style="text-align:center;">Antes de eu construir isso, me respondam</h2>
+      <p class="lead dim" style="text-align:center; margin-bottom:22px;">
+        Prefiro descobrir agora que a ideia é ruim do que depois de um mês codando.</p>
+      <div class="grid2">
+        <div class="card">
+          <h3 class="navy">1 &nbsp;·&nbsp; Vocês usariam?</h3>
+          <p>Não "é legal". <b>Você abriria numa quinta à noite sem ninguém chamar?</b></p>
+        </div>
+        <div class="card">
+          <h3 class="navy">2 &nbsp;·&nbsp; O que vocês veriam?</h3>
+          <p>Clipe? Filme? Live? Isso decide qual parte eu faço primeiro.</p>
+        </div>
+        <div class="card">
+          <h3 class="navy">3 &nbsp;·&nbsp; O boneco importa?</h3>
+          <p>Ou vocês só querem o vídeo sincronizado e o resto é enfeite?</p>
+        </div>
+        <div class="card" style="background:#ffffe1;">
+          <h3 class="navy">4 &nbsp;·&nbsp; QUAL O NOME?</h3>
+          <p>Sério, tá sem nome. <b>Manda sugestão no grupo</b> — quem acertar batiza a coisa.</p>
+        </div>
+      </div>
+      <div class="sunken" style="margin-top:20px; text-align:center; background:#000080; border-color:#808080 #fff #fff #808080;">
+        <p style="color:#fff; font-size:19px;">
+          Se pelo menos <b>5 pessoas</b> falarem "eu usaria" —<br>em 2 semanas tem versão pra testar.</p>
+      </div>
+    </div>
+  </div>
+  <div class="slideno">09</div>
+</div>
+
+<script>
+// ---- pixel avatar renderer ----
+// legend: K outline/dark  S skin  H hair  B shirt  P pants  W white(eye)
+const SPRITE = [
+  "..KKKK..",
+  ".KHHHHK.",
+  "KHHHHHHK",
+  "KSSSSSSK",
+  "KSWSSWSK",
+  "KSSSSSSK",
+  ".KSSSSK.",
+  "KKBBBBKK",
+  "KBBBBBBK",
+  "SBBBBBBS",
+  "KBBBBBBK",
+  ".KPPPPK.",
+  ".KPP PPK",
+  ".KK..KK."
+];
+
+function drawAvatar(colors, scale) {
+  const px = scale || 6;
+  const W = 8, H = SPRITE.length;
+  const map = { K:"#2b1a12", S:colors.skin, H:colors.hair, B:colors.shirt, P:colors.pants, W:"#ffffff" };
+  let r = "";
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const c = SPRITE[y][x];
+      if (!c || c === "." || c === " ") continue;
+      const fill = map[c];
+      if (!fill) continue;
+      r += `<rect x="${x*px}" y="${y*px}" width="${px}" height="${px}" fill="${fill}"/>`;
+    }
+  }
+  return `<svg class="av" width="${W*px}" height="${H*px}" viewBox="0 0 ${W*px} ${H*px}" shape-rendering="crispEdges">${r}</svg>`;
+}
+
+const SKINS  = ["#f0c8a0", "#d9a066", "#8d5524", "#5c3317", "#ffdbac"];
+const HAIRS  = ["#2b1a12", "#7a3b10", "#c8a415", "#a01818", "#3a3a8c", "#158a5a"];
+const SHIRTS = ["#c02020", "#2050c0", "#20a050", "#d0a000", "#802090", "#e07020", "#20a0a0"];
+const PANTS  = ["#303860", "#4a4a4a", "#6b4a2a", "#204020"];
+
+function mk(i) {
+  return {
+    skin:  SKINS[i % SKINS.length],
+    hair:  HAIRS[(i * 3 + 1) % HAIRS.length],
+    shirt: SHIRTS[(i * 5 + 2) % SHIRTS.length],
+    pants: PANTS[(i * 7) % PANTS.length]
+  };
+}
+
+// gallery on slide 5
+const gal = document.getElementById("avgallery");
+if (gal) {
+  const names = ["duda","rafa","bia","leo","tiago","nina","gus","mari"];
+  for (let i = 0; i < 8; i++) {
+    const d = document.createElement("div");
+    d.style.cssText = "display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px;";
+    d.innerHTML = drawAvatar(mk(i), 5) +
+      `<span style="font-size:11px;font-weight:bold;color:#000080;">${names[i]}</span>`;
+    gal.appendChild(d);
+  }
+}
+
+// people scattered in a room
+function populate(elId, people, scale) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  people.forEach((p, i) => {
+    const d = document.createElement("div");
+    d.className = "charpos";
+    d.style.left = p.x + "%";
+    d.style.bottom = p.y + "%";
+    let bub = "";
+    if (p.say) bub = `<div class="bubble" style="left:50%;transform:translateX(-50%);bottom:100%;margin-bottom:4px;">${p.say}</div>`;
+    d.innerHTML = bub + drawAvatar(mk(p.seed !== undefined ? p.seed : i), scale) +
+      `<div class="nm">${p.n}</div>`;
+    el.appendChild(d);
+  });
+}
+
+populate("nostalgia", [
+  { n:"duda", x:8,  y:16, seed:0, say:"bota aquela ♪" },
+  { n:"rafa", x:33, y:10, seed:3 },
+  { n:"bia",  x:54, y:20, seed:5, say:"kkkkk" },
+  { n:"leo",  x:76, y:8,  seed:2 }
+], 4);
+
+populate("mainroom", [
+  { n:"duda",  x:6,  y:20, seed:0 },
+  { n:"rafa",  x:24, y:34, seed:3, say:"pausa não!" },
+  { n:"bia",   x:42, y:16, seed:5 },
+  { n:"leo",   x:62, y:30, seed:2 },
+  { n:"tiago", x:82, y:18, seed:6, say:"cheguei" }
+], 4);
+</script>
+</body>
+</html>

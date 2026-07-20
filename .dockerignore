@@ -1,0 +1,10 @@
+dados.sqlite3
+__pycache__/
+*.pyc
+.git/
+template/
+ferramentas/
+deck-fonte.html
+*.pdf
+run.ps1
+render.yaml
