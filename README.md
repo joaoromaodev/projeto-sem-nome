@@ -14,6 +14,9 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
 
 > **Status:** em construção. A sala, o chat, as contas e o editor de avatar
 > funcionam. A sincronia de vídeo e o compartilhamento de tela ainda não.
+>
+> O caminho completo até o MVP, com as decisões e o porquê de cada uma, está
+> em **[docs/PLANO.md](docs/PLANO.md)**.
 
 <p align="center">
   <img src="template/boneco-guia.png" width="720"
