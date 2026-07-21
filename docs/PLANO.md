@@ -164,7 +164,10 @@ Não reabrir sem motivo novo.
 | **O sofá foi alargado, não escalado** | Pedido: caber 3 pessoas. Não dá pra resolver com escala — na altura certa (1×) a arte original comportava 1,9 boneco, e ampliar pra caber 3 deixaria o encosto mais alto que uma pessoa. Então a **arte** mudou: 80→128px, repetindo uma faixa do meio (16px, não uma coluna só, pra não esticar o tracejado do encosto) e preservando os braços nas pontas. |
 | **A tela minúscula é aceita por ora** | Com a TV em 1× o vídeo tem 46×30. Foi verificado que o YouTube **toca** nesse tamanho (um vídeo de 19s rodou até o fim e o contador de músicas subiu), mas ninguém assiste um filme aí. Aceito porque o uso real declarado é som de fundo com a aba escondida. Quando quiserem assistir de verdade, a saída não é inflar esta TV — é uma segunda tela, ou clicar nela pra expandir. |
 | **O buraco da tela é transparente no PNG** | A arte da TV vem com a tela em alpha 0, então o iframe fica **atrás** da moldura e aparece pelo buraco — sem máscara, sem `clip-path`, sem recorte. As coordenadas do buraco (x=17, y=28, 46×30 no sprite de 80×80) viram `calc()` no CSS em cima da escala, então mudar a escala move moldura, buraco e vídeo juntos, sem chance de um sair do lugar do outro. |
-| **A buzina nasce com trava, mesmo sendo temporária** | Ela toca som na máquina dos outros — a coisa mais fácil do projeto de virar brincadeira, e quem paga é quem está de fone. A trava (6s) é **por sala e não por pessoa**: o incômodo é o barulho, e pra quem ouve tanto faz se as dez buzinas vieram de um ou de dez. Limitar por pessoa deixaria a sala inteira buzinar em fila com o mesmo efeito. |
+| **A buzina deixa floodar, mas tem teto** | Era um intervalo mínimo entre buzinas e estava errado: a rajada é a graça, e quem precisa chamar de verdade buzina várias vezes seguidas. Agora são **10 numa janela de 40s**, sem espera nenhuma entre elas. A trava é **por sala e não por pessoa**: o incômodo é o barulho, e pra quem ouve tanto faz se as dez vieram de um ou de dez. |
+| **A janela é deslizante, não um contador que zera** | Com contador zerando a cada 40s, quem gastasse as 10 no fim de uma janela ganharia mais 10 no começo da seguinte — 20 buzinas seguidas, exatamente o que o teto existe pra impedir. Com janela deslizante cada buzina caduca 40s depois da sua vez, e o limite vale em qualquer trecho de 40s que se olhe. Quando barra, a mensagem diz **quantos segundos faltam** — sem o número, quem foi barrado fica martelando o botão pra descobrir. |
+| **O som é sintetizado, não é arquivo** | Nada pra baixar, nada pra licenciar, nada pra versionar — e o toque é ajustável mexendo em número. A corneta são duas vozes numa quarta justa (Mib e Láb, a razão 1.333 das buzinas de duas bocas), cada uma dobrada e desafinada em 3,5 Hz pra dar o batimento áspero que soa a instrumento, tudo passando por um passa-baixa que abre no ataque e fecha no fim, imitando a boca respondendo ao sopro. Uma nota só soaria despertador; sem o desafino, sintetizador barato. |
+| **O áudio passa por um limitador** | Medido: a corneta no ganho original estourava sozinha (pico 1,63, com 55 amostras ceifadas) — e som ceifado é exatamente o chiado que faz sintetizado soar ruim. Baixar o ganho resolveria uma buzina, mas não a rajada: elas duram 0,75s e várias se sobrepõem, somando amplitude. Baixar o bastante pra aguentar dez deixaria uma sozinha fraca demais, que é o caso comum. Um `DynamicsCompressor` na saída resolve os dois — verificado com 1, 4 e 10 sobrepostas: picos 0,88 / 0,92 / 0,95, nenhuma amostra estourada. |
 | **A buzina pisca o título além de tocar** | Só o som não resolve: metade do caso de uso é quem está com o volume baixo ou o fone tirado, e só enxerga a barra de abas. O som chama quem escuta; o título piscando chama quem só olha. Ele volta ao normal assim que a pessoa foca a aba, e desiste sozinho depois de 25s. |
 | **Volume é de cada um e não passa pelo servidor** | É o único ajuste do vídeo que não exige o controle remoto. Play, pause e seek mudam o que a sala inteira vê, e por isso são disputa; volume só mexe no ouvido de quem mexeu. Quem está de fone no escritório não deveria pedir licença pra abaixar — nem estourar o som dos outros ao ajustar o seu. Fica guardado no `localStorage` porque quem abaixou por estar no trabalho vai querer baixo na próxima também. |
 | **Mudo usa `mute()`, não volume 0** | Em 0 o YouTube ainda deixa passar um fiapo de som em alguns navegadores. Além disso `mute()` preserva o nível anterior, então voltar do mudo devolve o volume que a pessoa tinha escolhido em vez de chutar 100. |
@@ -279,10 +282,18 @@ até o fim sozinho e o contador de músicas da sala subiu.
 pontinhos aparecendo sobre o boneco certo, com os três pontos animando
 escalonados, e sumindo quando a pessoa sai; quem digita **não** recebe o
 próprio aviso; a buzina chegando nos dois lados (inclusive em quem
-apertou, que é o retorno de que funcionou); a segunda buzina seguida sendo
-barrada com aviso e **não** chegando nos outros; a trava soltando depois
-do intervalo; o título piscando e voltando ao normal quando a aba é
+apertou, que é o retorno de que funcionou); uma **rajada de 10 seguidas
+passando sem espera nenhuma** e o saldo caindo 9→0; a 11ª sendo barrada
+com aviso e **não** chegando nos outros; a contagem regressiva andando
+(40s → 35s); o título piscando e voltando ao normal quando a aba é
 focada; e `ligado: "talvez"` sendo ignorado sem derrubar a conexão.
+
+**Verificado no som (renderizado offline e medido, já que ouvir não
+dava):** a corneta com pico 0,88 e zero amostras estouradas; o mesmo com
+4 e com 10 sobrepostas (0,92 e 0,95) graças ao limitador; e o espectro
+batendo com o desenho — energia igual nas duas vozes (311 e 415 Hz),
+harmônicos presentes, e frequências fora de nota **11× mais fracas**, ou
+seja tonal e não ruído.
 
 **Bug de uso achado aí:** o spawn do servidor sorteava `y` entre 20 e 60%,
 e a TV ocupa a partir de ~36% — quem caísse atrás dela entrava na sala
@@ -492,9 +503,9 @@ exatamente o comportamento que o projeto quer.
       mesma sala, todos de música com a aba escondida — em vez de mandar
       WhatsApp por algo urgente, aperta o botão e todo mundo olha a aba.
       Fora desse contexto é só um botão que faz barulho na máquina alheia.
-      Já nasceu com trava de 6s por sala (ver decisões travadas), mas trava
-      não resolve o problema de fundo, que é não ter dono: **qualquer um
-      buzina pra qualquer um**. Se for pra ficar, precisa virar outra
+      Tem teto de 10 por 40s (ver decisões travadas), mas teto não resolve
+      o problema de fundo, que é não ter dono: **qualquer um buzina pra
+      qualquer um**. Se for pra ficar, precisa virar outra
       coisa — menção com @, ou aviso só pra quem escolheu receber. Pra
       remover: `BuzinaIn` no `protocol.py`, o ramo no `main.py`,
       `Room.buzinar`, e o botão + `tocarBuzina`/`chamarAtencao` no

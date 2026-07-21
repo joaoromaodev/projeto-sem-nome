@@ -405,26 +405,93 @@ for (const gesto of ["pointerdown", "keydown"]) {
   addEventListener(gesto, destravarAudio, { once: true });
 }
 
+/* Numa rajada as buzinas chegam quase juntas. Dez cornetas de 0,75s
+   soando sobrepostas somam amplitude, estouram na saída e viram ruído
+   sujo em vez de dez toques. Este piso separa os disparos o bastante pra
+   cada um ser ouvido como um toque. */
+const BUZINA_MIN_MS = 220;
+let ultimaBuzinaTocada = 0;
+
+/* Barramento de saída com limitador.
+
+   Uma corneta sozinha já foi calibrada pra não estourar, mas ela dura
+   0,75s e numa rajada três ou quatro se sobrepõem — as amplitudes somam e
+   o estouro volta. Baixar o ganho a ponto de aguentar quatro deixaria uma
+   sozinha fraca demais, que é o caso comum.
+
+   O compressor resolve os dois: deixa a buzina única com o volume que ela
+   merece e segura o pico quando várias se empilham. */
+let saida = null;
+
+function barramento() {
+  if (!saida) {
+    saida = audio.createDynamicsCompressor();
+    saida.threshold.value = -8;
+    saida.knee.value = 6;
+    saida.ratio.value = 12;
+    saida.attack.value = 0.003;
+    saida.release.value = 0.25;
+    saida.connect(audio.destination);
+  }
+  return saida;
+}
+
 function tocarBuzina() {
   try {
     destravarAudio();
     if (!audio) return;
 
+    const agora = performance.now();
+    if (agora - ultimaBuzinaTocada < BUZINA_MIN_MS) return;
+    ultimaBuzinaTocada = agora;
+
     const t0 = audio.currentTime;
-    // duas notas descendo, tipo buzina de portaria
-    for (const [atraso, hz] of [[0, 466], [0.16, 370]]) {
-      const osc = audio.createOscillator();
-      const vol = audio.createGain();
-      osc.type = "sawtooth";
-      osc.frequency.value = hz;
-      // envelope: sobe rápido e cai, senão estala no começo e no fim
-      vol.gain.setValueAtTime(0, t0 + atraso);
-      vol.gain.linearRampToValueAtTime(0.22, t0 + atraso + 0.02);
-      vol.gain.setValueAtTime(0.22, t0 + atraso + 0.13);
-      vol.gain.linearRampToValueAtTime(0, t0 + atraso + 0.3);
-      osc.connect(vol).connect(audio.destination);
-      osc.start(t0 + atraso);
-      osc.stop(t0 + atraso + 0.32);
+    const DUR = 0.75;
+
+    /* Corneta, não bipe. O que faz soar como corneta e não como
+       sintetizador são três coisas juntas:
+
+       1. Duas vozes numa quarta justa (Mib e Láb). É o intervalo das
+          cornetas e buzinas de caminhão de duas bocas — sozinha, uma nota
+          só soa como despertador.
+       2. Cada voz sai dobrada e desafinada por alguns hertz. As duas
+          cópias entram e saem de fase e produzem aquele batimento áspero
+          que dá o "corpo" do instrumento. Sem isso o som fica liso e
+          eletrônico demais.
+       3. Um passa-baixa que abre rápido no ataque e fecha no fim, imitando
+          a boca do instrumento respondendo ao sopro. É isso que dá o
+          "uáá" em vez de um tom chapado. */
+
+    const filtro = audio.createBiquadFilter();
+    filtro.type = "lowpass";
+    filtro.Q.value = 6;
+    filtro.frequency.setValueAtTime(500, t0);
+    filtro.frequency.exponentialRampToValueAtTime(3800, t0 + 0.09);
+    filtro.frequency.setValueAtTime(3800, t0 + DUR - 0.18);
+    filtro.frequency.exponentialRampToValueAtTime(900, t0 + DUR);
+
+    const mestre = audio.createGain();
+    // 0.16 medido: com 0.3 o pico passava de 1.6 e estourava na saída (55
+    // amostras ceifadas), que é exatamente o chiado que faz um sintetizado
+    // soar barato. Aqui o pico fica em 0.87.
+    mestre.gain.setValueAtTime(0, t0);
+    mestre.gain.linearRampToValueAtTime(0.16, t0 + 0.035);
+    mestre.gain.setValueAtTime(0.16, t0 + DUR - 0.1);
+    mestre.gain.linearRampToValueAtTime(0, t0 + DUR);
+
+    filtro.connect(mestre).connect(barramento());
+
+    for (const base of [311.1, 415.3]) {          // Mib4 e Láb4
+      for (const desafino of [-3.5, 3.5]) {
+        const osc = audio.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(base * 0.94, t0);
+        // a nota "firma" logo no começo, como sopro pegando pressão
+        osc.frequency.linearRampToValueAtTime(base + desafino, t0 + 0.06);
+        osc.connect(filtro);
+        osc.start(t0);
+        osc.stop(t0 + DUR);
+      }
     }
   } catch {
     // sem áudio disponível: o título piscando ainda avisa
@@ -456,14 +523,12 @@ function chamarAtencao() {
   setTimeout(() => { if (piscando) parar(); }, 25000);
 }
 
+// Sem travar o botão: floodar é permitido de propósito, e é o servidor
+// que segura o teto (10 numa janela de 40s). Quando ele barrar, a
+// mensagem dele diz quantos segundos faltam.
 $("#buzina").onclick = () => {
   if (!conectado()) return sistema("sem conexão — tenta de novo em instantes");
   enviar({ type: "buzina" });
-  // Trava o botão pelo mesmo tempo que o servidor trava, pra quem apertou
-  // ver que não adianta martelar.
-  const b = $("#buzina");
-  b.disabled = true;
-  setTimeout(() => { b.disabled = false; }, 6000);
 };
 
 /* `saindo` avisa o laço de reconexão que a queda do socket foi de propósito
@@ -974,6 +1039,11 @@ function receber(m) {
       tocarBuzina();
       chamarAtencao();
       linha(`<b>📣 ${esc(m.nick)} buzinou!</b>`, "sis");
+      // Só avisa quando está acabando. Dizer o saldo a cada buzina
+      // encheria o chat justamente na hora da rajada.
+      if (typeof m.restam === "number" && m.restam > 0 && m.restam <= 3) {
+        sistema(`resta${m.restam > 1 ? "m" : ""} ${m.restam} buzina${m.restam > 1 ? "s" : ""} pra sala`);
+      }
       break;
 
     case "sistema":

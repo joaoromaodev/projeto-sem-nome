@@ -479,15 +479,22 @@ async def ws_sala(ws: WebSocket, code: str):
                 )
 
             elif isinstance(msg, BuzinaIn):
-                if not room.buzinar():
+                pode, espera = room.buzinar()
+                if not pode:
+                    # Dizer quanto falta em vez de só "não": sem o número,
+                    # quem foi barrado fica martelando o botão pra
+                    # descobrir quando volta.
                     await ws.send_json(ev(
-                        "aviso", texto="calma — a buzina tem intervalo"
+                        "aviso",
+                        texto=f"a sala já buzinou demais — volta em {espera:.0f}s",
                     ))
                     continue
                 # Vai pra todo mundo, inclusive quem buzinou: o retorno é o
                 # que confirma que funcionou. Sem isso, quem apertou e não
                 # ouviu nada (aba muda, som desligado) aperta de novo.
-                await room.broadcast(ev("buzina", nick=user.nick))
+                await room.broadcast(ev(
+                    "buzina", nick=user.nick, restam=room.buzinas_restantes()
+                ))
 
             # ---------------------------------------------------- vídeo
             # Quem manda no player é quem está com o controle remoto — um

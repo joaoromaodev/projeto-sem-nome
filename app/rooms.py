@@ -30,8 +30,10 @@ MAX_LOBBY = 30
 # sala na lista; mandar os 30 do lobby seria payload à toa.
 AMOSTRA = 6
 
-# Espera mínima entre duas buzinas da mesma sala.
-BUZINA_ESPERA_S = 6.0
+# Teto de buzinas da sala: até BUZINA_MAX numa janela deslizante de
+# BUZINA_JANELA_S. Rajada é permitida; rajada infinita não.
+BUZINA_MAX = 10
+BUZINA_JANELA_S = 40.0
 
 SLUG_RE = re.compile(r"[^a-z0-9]+")
 
@@ -118,8 +120,8 @@ class Room:
         self.controle: str = ""
         self.controle_pos = Pos(x=50, y=80)
 
-        # Última buzina da sala. Ver `buzinar`.
-        self.ultima_buzina = 0.0
+        # Quando cada buzina recente tocou. Ver `buzinar`.
+        self.buzinas: list[float] = []
 
         self._lock = asyncio.Lock()
 
@@ -153,23 +155,42 @@ class Room:
 
     # ---------------------------------------------------------- buzina
 
-    def buzinar(self) -> bool:
-        """Pode buzinar agora? Trava por sala, não por pessoa.
+    def buzinar(self) -> tuple[bool, float]:
+        """Pode buzinar agora? Devolve (pode, segundos até liberar).
 
-        A trava é por sala de propósito: o incômodo é o barulho na máquina
-        dos outros, e pra quem ouve tanto faz se as dez buzinas vieram de
-        uma pessoa ou de dez. Limitar por pessoa deixaria a sala inteira
-        buzinar em sequência e o efeito seria o mesmo.
+        Era um intervalo mínimo entre buzinas, e a rajada é justamente a
+        graça — buzinar em sequência quando a coisa é urgente de verdade.
+        Agora vale floodar à vontade **até um teto**: 10 buzinas em 40s.
 
-        Vale a pena existir mesmo sendo um recurso temporário: som que
-        toca sozinho na máquina alheia é a coisa mais fácil de virar
-        brincadeira, e quem paga é quem está de fone.
+        A janela é deslizante e não um contador que zera de tempo em
+        tempo. Com contador zerando, quem gastasse as 10 no fim de uma
+        janela ganharia mais 10 no começo da seguinte — 20 buzinas
+        seguidas, que é exatamente o que o teto existe pra impedir. Aqui
+        cada buzina caduca 40s depois da sua vez, então o limite vale em
+        qualquer trecho de 40s que se olhe.
+
+        A trava é por **sala**, não por pessoa: o incômodo é o barulho, e
+        pra quem ouve tanto faz se as dez vieram de uma pessoa ou de dez.
+        Limitar por pessoa deixaria a sala inteira buzinar em fila com o
+        mesmo efeito.
         """
         agora = time.monotonic()
-        if agora - self.ultima_buzina < BUZINA_ESPERA_S:
-            return False
-        self.ultima_buzina = agora
-        return True
+        # descarta o que já saiu da janela
+        self.buzinas = [t for t in self.buzinas if agora - t < BUZINA_JANELA_S]
+
+        if len(self.buzinas) >= BUZINA_MAX:
+            # a mais antiga é a que vai liberar a próxima vaga
+            libera_em = BUZINA_JANELA_S - (agora - self.buzinas[0])
+            return False, max(0.0, libera_em)
+
+        self.buzinas.append(agora)
+        return True, 0.0
+
+    def buzinas_restantes(self) -> int:
+        """Quantas ainda cabem na janela. Só pra mostrar na tela."""
+        agora = time.monotonic()
+        vivas = sum(1 for t in self.buzinas if agora - t < BUZINA_JANELA_S)
+        return max(0, BUZINA_MAX - vivas)
 
     # ------------------------------------------------------------ fila
 
