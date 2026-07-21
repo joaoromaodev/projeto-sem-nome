@@ -10,7 +10,10 @@
   .tela { display: flex; gap: 8px; width: 100%; height: 100%; }
   .esquerda { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .direita { width: 260px; flex: none; display: flex; flex-direction: column; gap: 8px; }
-  .direita .win:first-child { flex: 1; min-height: 0; }
+  /* O chat é quem estica pra ocupar a sobra. Era ":first-child", mas o
+     telão passou pra frente dele na coluna — regra por posição quebra
+     quando a ordem muda, então agora é por nome. */
+  .direita .chat { flex: 1; min-height: 0; }
   .corpo.semfolga { padding: 0; display: flex; flex-direction: column; }
   #dizer { flex: 1; min-width: 0; }
   .barra {
@@ -32,6 +35,36 @@
   /* z acima de qualquer boneco (o maior que eles chegam é ~1000) */
   #painel { position: absolute; right: 12px; top: 12px; width: 200px; z-index: 2000; }
   #painel .corpo { padding: 8px 10px 10px; }
+
+  /* ---- vídeo ---- */
+  .telao { flex: none; margin-bottom: 8px; }
+  .telao .corpo { padding: 0; }
+  #moldura {
+    position: relative; width: 100%; aspect-ratio: 16 / 9;
+    background: #000; overflow: hidden;
+  }
+  #moldura iframe { display: block; width: 100%; height: 100%; border: 0; }
+  /* A tela de gesto: sem um clique do usuário o navegador barra o áudio.
+     Não é enfeite, é requisito do navegador. */
+  #liberar {
+    position: absolute; inset: 0; z-index: 5;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    background: rgba(10,8,16,.88); color: #fff;
+    cursor: pointer; text-align: center; padding: 12px;
+  }
+  #liberar b { font-size: 15px; }
+  #liberar span { font-size: 11px; color: #c8c0d8; }
+  #semvideo {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    color: #6a6280; font-size: 12px; text-align: center; padding: 12px;
+  }
+  .linhavideo { display: flex; gap: 5px; padding: 5px; }
+  #link { flex: 1; min-width: 0; }
+  #estadovideo {
+    font-size: 10px; padding: 0 6px 5px; min-height: 13px;
+  }
 </style>
 </head>
 <body>
@@ -78,7 +111,27 @@
 
   <!-- ---------------- chat ---------------- -->
   <div class="direita">
-    <div class="win">
+
+    <div class="win telao">
+      <div class="tbar"><span class="t">■ telão</span></div>
+      <div class="corpo">
+        <div id="moldura">
+          <div id="player"></div>
+          <div id="semvideo">cole um link do YouTube aqui embaixo</div>
+          <div id="liberar" hidden>
+            <b>▶ clique pra entrar</b>
+            <span>o navegador não deixa o som começar sozinho</span>
+          </div>
+        </div>
+        <div class="linhavideo">
+          <input type="text" id="link" placeholder="link do YouTube" autocomplete="off">
+          <button id="poriVideo" style="padding:4px 10px;">pôr</button>
+        </div>
+        <div id="estadovideo" class="dim"></div>
+      </div>
+    </div>
+
+    <div class="win chat">
       <div class="tbar"><span class="t">■ conversa</span></div>
       <div class="corpo semfolga">
         <div id="chatlog"></div>

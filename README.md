@@ -35,9 +35,12 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
 - **Editor de avatar** — cinco camadas (pele, pernas, sapatos, torso,
   cabelo), cada uma com peça e cor livres, mais um guarda-roupa de looks
 
+- **Vídeo do YouTube sincronizado** — cola o link e toca junto pra todo
+  mundo; quem chega no meio entra no ponto certo
+
 ## O que ainda não
 
-- Sincronia de vídeo do YouTube (é a próxima etapa, e a mais difícil)
+- Fila de vídeos (hoje é um de cada vez)
 - Compartilhamento de tela por WebRTC
 - Sala privada — qualquer um logado entra em qualquer sala
 - Histórico da sala — a sala some quando o servidor reinicia; as contas não
@@ -74,6 +77,19 @@ Trocar a cor de uma peça muda o matiz e mantém a claridade de cada pixel, em
 vez de chapar tudo — o sombreado que o artista desenhou sobrevive. Pixel
 abaixo de 16% de claridade fica como está, senão o contorno preto viraria
 uma versão escura da cor escolhida e o boneco perderia definição.
+
+**O servidor é o relógio do vídeo, e ninguém confia no próprio player.**
+O servidor guarda o par (posição, instante) em vez de uma posição "atual" —
+posição atual envelheceria no caminho. Cada cliente reconstrói onde deveria
+estar e **se corrige**: menos de 0,5s de desvio fica quieto, entre 0,5s e 2s
+ele acelera ou freia 5% (ninguém percebe, e o vídeo não pula), e só acima de
+2s ele pula. Essa correção suave é o que separa "funciona" de "funciona
+bem" — sem ela o vídeo fica dando pulinhos o tempo todo.
+
+**Qualquer um da sala mexe no player.**
+Não existe host. A referência é a sala de música do Transformice, onde o
+controle era de todos; entre amigos, host é atrito. Como o servidor já é a
+fonte da verdade, acrescentar dono depois não exige redesenhar nada.
 
 **A lista de salas mostra presença, não nota.**
 Chegou a ser considerado um sistema de avaliação das salas, e foi descartado.
@@ -185,6 +201,7 @@ static/
   js/sprites.js carrega, recolore e guarda os sprites em cache
   js/editor.js  painel do boneco: peças, cores e guarda-roupa
   js/api.js     conversa com o servidor
+  js/video.js   o player e a correção de deriva
   js/sala.js    conexão, movimento e chat
   css/y2k.css   a cara Win98
 ferramentas/    gerar camadas provisórias e validar sprites

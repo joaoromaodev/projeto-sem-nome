@@ -10,6 +10,7 @@ import { desenhar, LARG, ALT_CANVAS, normalizar, definirManifesto } from "./avat
 import { preaquecer } from "./sprites.js";
 import { api } from "./api.js";
 import { montarPainel } from "./editor.js";
+import * as video from "./video.js";
 
 const $ = (s) => document.querySelector(s);
 const chao = $("#chao");
@@ -305,6 +306,67 @@ function sairPara(destino) {
   location.href = destino;
 }
 
+/* ------------------------------------------------------------ vídeo */
+
+let musicasOuvidas = 0;
+let playerMontado = false;
+let ultimoEstado = null;
+
+/* O player só é construído quando a sala precisa dele. Montar sempre
+   carregaria o iframe do YouTube em toda sala vazia, de graça. */
+async function garantirPlayer() {
+  if (playerMontado) return;
+  playerMontado = true;
+  $("#semvideo").hidden = true;
+  await video.montarPlayer($("#player"), {
+    enviar: (msg) => enviar(msg),
+    carregando: () => estadoVideo("carregando..."),
+    erro: (txt) => sistema(txt),
+  });
+}
+
+function estadoVideo(txt) {
+  $("#estadovideo").textContent = txt;
+}
+
+async function mostrarVideo(est) {
+  if (!est || !est.id) return;
+  ultimoEstado = est;
+  await garantirPlayer();
+
+  // Sem o gesto do usuário o navegador barra o áudio. A tela de clique é
+  // requisito do navegador, não escolha de design.
+  if (!video.estaLiberado()) {
+    $("#liberar").hidden = false;
+    estadoVideo("clique no telão pra entrar");
+    return;
+  }
+  video.aplicar(est);
+  estadoVideo(est.tocando ? "tocando" : "pausado");
+}
+
+$("#liberar").onclick = async () => {
+  $("#liberar").hidden = true;
+  await garantirPlayer();
+  video.liberarAudio();
+  if (ultimoEstado) video.aplicar(ultimoEstado);
+  estadoVideo("entrou");
+};
+
+function porVideo() {
+  const v = $("#link").value.trim();
+  if (!v) return $("#link").focus();
+  if (!conectado()) return sistema("sem conexão — tenta de novo em instantes");
+  enviar({ type: "video_por", video: v });
+  $("#link").value = "";
+  // Quem cola o link está interagindo com a página: o gesto de autoplay
+  // já vale, então não faz sentido pedir clique de novo pra essa pessoa.
+  garantirPlayer().then(() => video.liberarAudio());
+}
+
+$("#poriVideo").onclick = porVideo;
+$("#link").addEventListener("keydown", (e) => { if (e.key === "Enter") porVideo(); });
+
 $("#sair").onclick = () => sairPara("/");
 $("#trocar").onclick = () => sairPara("/");
 $("#irLobby").onclick = () => {
@@ -446,6 +508,8 @@ function receber(m) {
       $("#titulo").textContent = "■ sala :: " + codigoReal;
       sistema(`você entrou em "${codigoReal}"`);
       pintarLista();
+      // Quem chega no meio do filme já entra no ponto certo.
+      if (m.video && m.video.id) mostrarVideo(m.video);
       break;
     }
 
@@ -473,6 +537,23 @@ function receber(m) {
       if (p) p.destino = { x: m.pos.x, y: m.pos.y };
       break;
     }
+
+    case "video_trocou":
+      sistema(`${m.por} colocou um vídeo`);
+      mostrarVideo(m);
+      break;
+
+    case "video_estado":
+      if (typeof m.musicas === "number") {
+        musicasOuvidas = m.musicas;
+        sistema(`acabou — ${musicasOuvidas} já tocaram nesta sala`);
+      }
+      mostrarVideo(m);
+      break;
+
+    case "sistema":
+      sistema(m.texto);
+      break;
 
     case "trocou_avatar": {
       const p = gente.get(m.uid);

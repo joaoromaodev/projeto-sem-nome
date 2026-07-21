@@ -16,8 +16,9 @@ from starlette.websockets import WebSocketDisconnect
 
 from . import db
 from .protocol import (Avatar, AvatarIn, ChatIn, MoveIn, NickIn, PingIn, Pos,
-                       ev, limpar_nick, parse)
-from .rooms import LOBBY, User, manager
+                       VideoFimIn, VideoPauseIn, VideoPlayIn, VideoPorIn,
+                       VideoSeekIn, ev, limpar_nick, parse)
+from .rooms import LOBBY, User, Video, manager
 
 RAIZ = Path(__file__).resolve().parent.parent
 ESTATICO = RAIZ / "static"
@@ -32,11 +33,16 @@ _tentativas: dict[str, list[float]] = defaultdict(list)
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     db.iniciar()
-    faxina = asyncio.create_task(_housekeeping())
+    tarefas = [
+        asyncio.create_task(_housekeeping()),
+        asyncio.create_task(_batida_video()),
+    ]
     yield
-    faxina.cancel()
-    with contextlib.suppress(asyncio.CancelledError):
-        await faxina
+    for t in tarefas:
+        t.cancel()
+    for t in tarefas:
+        with contextlib.suppress(asyncio.CancelledError):
+            await t
 
 
 async def _housekeeping():
@@ -44,6 +50,27 @@ async def _housekeeping():
         await asyncio.sleep(600)
         manager.limpar_vazias()
         db.limpar_sessoes_velhas()
+
+
+# De quanto em quanto tempo o servidor conta a posição canônica do vídeo.
+# 3s é o meio-termo do plano: mais raro deixa a deriva crescer demais antes
+# da correção, mais frequente é tráfego à toa numa sala parada.
+BATIDA_S = 3.0
+
+
+async def _batida_video():
+    """Manda a posição canônica pra quem está vendo vídeo.
+
+    É isto que segura a sincronia: cada cliente compara a própria posição
+    com esta e se corrige. O servidor não pergunta nada a ninguém — ele só
+    afirma, e quem estiver fora de lugar que se ajuste.
+    """
+    while True:
+        await asyncio.sleep(BATIDA_S)
+        for room in list(manager.rooms.values()):
+            if not room.users or not room.video.id or not room.video.tocando:
+                continue
+            await room.broadcast(ev("video_estado", **room.video.estado()))
 
 
 app = FastAPI(title="projeto sem nome", lifespan=lifespan)
@@ -316,6 +343,9 @@ async def ws_sala(ws: WebSocket, code: str):
             eu=user.publico(),
             sala={"code": room.code, "musicas": room.musicas_ouvidas},
             gente=room.roster(),
+            # Quem chega no meio do filme já entra no ponto certo, em vez
+            # de começar do zero e ser puxado pela primeira batida.
+            video=room.video.estado(),
         ))
         await room.broadcast(ev("entrou", user=user.publico()), exceto=uid)
 
@@ -356,6 +386,40 @@ async def ws_sala(ws: WebSocket, code: str):
 
             elif isinstance(msg, PingIn):
                 await ws.send_json(ev("pong"))
+
+            # ---------------------------------------------------- vídeo
+            # Não existe papel de host: numa sala de amigos, qualquer um
+            # mexe no player. É de propósito — a referência é a sala de
+            # música do Transformice, onde o controle era de todos. Se
+            # virar bagunça, host entra depois; começar com host seria
+            # resolver um problema que ainda não apareceu.
+
+            elif isinstance(msg, VideoPorIn):
+                room.video = Video(id=msg.video, tocando=True, por=user.nick)
+                room.video.marcar(0.0, tocando=True)
+                # Só `video_trocou`: ele já carrega o `por`, e o cliente
+                # escreve a linha no chat. Mandar um "sistema" junto fazia
+                # a mensagem aparecer duas vezes.
+                await room.broadcast(ev("video_trocou", **room.video.estado()))
+
+            elif isinstance(msg, (VideoPlayIn, VideoPauseIn, VideoSeekIn)):
+                if not room.video.id:
+                    continue
+                tocando = not isinstance(msg, VideoPauseIn)
+                room.video.marcar(msg.pos, tocando=tocando)
+                # Vai pra todo mundo, inclusive quem mandou: assim quem
+                # pediu também confirma pela verdade do servidor em vez de
+                # confiar no próprio player.
+                await room.broadcast(ev("video_estado", **room.video.estado()))
+
+            elif isinstance(msg, VideoFimIn):
+                # Chega uma vez por pessoa; a sala trata só a primeira.
+                if room.video_acabou():
+                    await room.broadcast(ev(
+                        "video_estado",
+                        **room.video.estado(),
+                        musicas=room.musicas_ouvidas,
+                    ))
 
     except WebSocketDisconnect:
         pass

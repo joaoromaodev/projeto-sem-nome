@@ -19,6 +19,36 @@ LARG, ALT = 32, 48          # tamanho do sprite; tem que bater com o sprites.js
 COR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 PECA_RE = re.compile(r"^[a-z0-9-]{0,24}$")
 
+# Id de vídeo do YouTube: 11 caracteres de um alfabeto fechado. Validar aqui
+# importa porque esse id vai parar num iframe no navegador de todo mundo da
+# sala — não é lugar pra aceitar string livre.
+VIDEO_ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+
+# De onde dá pra tirar o id: o usuário cola a URL da barra de endereço, o
+# link curto do botão compartilhar, ou o id pelado.
+_URL_RES = [
+    re.compile(r"(?:youtube\.com|youtube-nocookie\.com)/watch\?(?:.*&)?v=([A-Za-z0-9_-]{11})"),
+    re.compile(r"youtu\.be/([A-Za-z0-9_-]{11})"),
+    re.compile(r"(?:youtube\.com|youtube-nocookie\.com)/(?:embed|shorts|live|v)/([A-Za-z0-9_-]{11})"),
+]
+
+# Teto de posição: 24h em segundos. Não existe vídeo maior, e sem teto uma
+# posição absurda faria o cliente ficar tentando alcançar um ponto que não
+# chega nunca.
+POS_MAX = 86400.0
+
+
+def extrair_video_id(v: str) -> str:
+    """Aceita id pelado ou qualquer formato de link do YouTube."""
+    v = (v or "").strip()
+    if VIDEO_ID_RE.match(v):
+        return v
+    for r in _URL_RES:
+        m = r.search(v)
+        if m:
+            return m.group(1)
+    raise ValueError("não reconheci esse link do YouTube")
+
 
 def _cor(v: str) -> str:
     if not isinstance(v, str) or not COR_RE.match(v):
@@ -122,7 +152,48 @@ class PingIn(BaseModel):
     type: Literal["ping"]
 
 
-IncomingT = ChatIn | MoveIn | AvatarIn | NickIn | PingIn
+# ------------------------------------------------------------------ vídeo
+# O servidor é a fonte da verdade da reprodução. O cliente nunca trata o
+# próprio player como verdade: ele manda a intenção ("dei play em tal
+# ponto") e depois corrige a si mesmo pelo que o servidor devolve.
+
+class VideoPorIn(BaseModel):
+    """Trocar o vídeo da sala. Aceita link ou id."""
+
+    type: Literal["video_por"]
+    video: str
+
+    _v = field_validator("video")(extrair_video_id)
+
+
+class VideoPlayIn(BaseModel):
+    type: Literal["video_play"]
+    pos: float = Field(0, ge=0, le=POS_MAX)
+
+
+class VideoPauseIn(BaseModel):
+    type: Literal["video_pause"]
+    pos: float = Field(0, ge=0, le=POS_MAX)
+
+
+class VideoSeekIn(BaseModel):
+    type: Literal["video_seek"]
+    pos: float = Field(0, ge=0, le=POS_MAX)
+
+
+class VideoFimIn(BaseModel):
+    """O player avisou que o vídeo acabou.
+
+    Vem de todo mundo ao mesmo tempo, então o servidor precisa ignorar as
+    repetições — ver `Room.video_acabou`.
+    """
+
+    type: Literal["video_fim"]
+
+
+IncomingT = (ChatIn | MoveIn | AvatarIn | NickIn | PingIn
+             | VideoPorIn | VideoPlayIn | VideoPauseIn | VideoSeekIn
+             | VideoFimIn)
 
 
 class Incoming(BaseModel):

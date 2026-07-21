@@ -41,6 +41,45 @@ def slugify(nome: str) -> str:
 
 
 @dataclass
+class Video:
+    """O que está tocando na sala, do ponto de vista do servidor.
+
+    Guardamos a posição de um instante conhecido (`pos` em `desde`) em vez
+    de uma posição "atual": posição atual envelheceria entre o cálculo e a
+    chegada da mensagem. Com o par (posição, instante) o cliente reconstrói
+    onde deveria estar agora, por mais atrasada que a mensagem chegue.
+
+    `desde` usa relógio monotônico de propósito — `time.time()` pode andar
+    pra trás com ajuste de NTP e faria a posição saltar.
+    """
+
+    id: str = ""
+    tocando: bool = False
+    pos: float = 0.0
+    desde: float = field(default_factory=time.monotonic)
+    # Quem pediu o vídeo. Só pra mostrar no chat; não dá poder nenhum.
+    por: str = ""
+
+    def posicao_agora(self) -> float:
+        if not self.id or not self.tocando:
+            return self.pos
+        return self.pos + (time.monotonic() - self.desde)
+
+    def marcar(self, pos: float, tocando: bool) -> None:
+        self.pos = max(0.0, pos)
+        self.tocando = tocando
+        self.desde = time.monotonic()
+
+    def estado(self) -> dict:
+        return {
+            "id": self.id,
+            "tocando": self.tocando,
+            "pos": round(self.posicao_agora(), 3),
+            "por": self.por,
+        }
+
+
+@dataclass
 class User:
     uid: str          # identifica a conexão (a mesma conta pode abrir 2 abas)
     nick: str
@@ -65,8 +104,22 @@ class Room:
         self.code = code
         self.users: dict[str, User] = {}
         self.criada_em = time.time()
-        self.musicas_ouvidas = 0  # contador que aparece na sala; cresce na etapa do YouTube
+        self.musicas_ouvidas = 0
+        self.video = Video()
         self._lock = asyncio.Lock()
+
+    def video_acabou(self) -> bool:
+        """Trata o fim do vídeo uma vez só.
+
+        O evento de fim dispara no player de todo mundo quase junto, então
+        chegam N mensagens iguais. Sem esta guarda o contador de músicas
+        subiria uma vez por pessoa na sala.
+        """
+        if not self.video.id or not self.video.tocando:
+            return False
+        self.video.marcar(self.video.pos, tocando=False)
+        self.musicas_ouvidas += 1
+        return True
 
     @property
     def eh_lobby(self) -> bool:
@@ -95,6 +148,9 @@ class Room:
             "gente": len(self.users),
             "limite": self.limite,
             "lobby": self.eh_lobby,
+            # se tem vídeo rolando, a lista mostra — é sinal de vida tanto
+            # quanto a contagem de gente
+            "video": self.video.id if self.video.tocando else "",
             "nicks": [u.nick for u in self.users.values()][:AMOSTRA],
             "avatares": [
                 u.avatar.model_dump() for u in self.users.values()

@@ -151,17 +151,28 @@ posição esperada e corrigem a sua.
 
 ### Tarefas
 
-- [ ] Carregar a YouTube Iframe API e montar o player na sala
-- [ ] Estado do vídeo em `rooms.py` (id, tocando, posição, timestamp)
-- [ ] Mensagens novas no `protocol.py`: `video_por`, `video_play`,
-      `video_pause`, `video_seek`, `video_estado`
+- [x] Carregar a YouTube Iframe API e montar o player na sala
+- [x] Estado do vídeo em `rooms.py` (id, tocando, posição, timestamp)
+- [x] Mensagens novas no `protocol.py`: `video_por`, `video_play`,
+      `video_pause`, `video_seek`, `video_estado`, `video_fim`
+- [x] Heartbeat do servidor a cada ~3s com a posição canônica
+- [x] Correção de deriva no cliente (ver armadilha 2 abaixo)
+- [x] Tela de "clique pra entrar" resolvendo o autoplay (armadilha 3)
+- [x] Aviso no chat quando alguém está carregando (armadilha 4)
+- [x] Contador `musicas_ouvidas` da sala, com guarda contra contar N vezes
+      (o fim do vídeo dispara no player de todo mundo quase junto)
+- [x] Quem entra no meio do vídeo já cai no ponto certo
 - [ ] Fila de vídeos por sala (adicionar, remover, pular)
-- [ ] Papel de host: só quem tem o controle manda no player
-- [ ] Heartbeat do servidor a cada ~3s com a posição canônica
-- [ ] Correção de deriva no cliente (ver armadilha 2 abaixo)
-- [ ] Tela de "clique pra entrar" resolvendo o autoplay (armadilha 3)
-- [ ] Aviso no chat quando alguém está carregando (armadilha 4)
-- [ ] Contador `musicas_ouvidas` da sala (já existe o campo, falta incrementar)
+- [ ] Título do vídeo (hoje aparece só o id; exige a API de dados do
+      YouTube, que precisa de chave)
+
+**Papel de host: adiado de propósito, não esquecido.** O plano previa "só
+quem tem o controle manda no player", e a implementação deixou qualquer um
+da sala mexer. Motivo: a referência é a sala de música do Transformice,
+onde o controle era de todos, e host é atrito num grupo de amigos. Começar
+com host seria resolver um problema que ainda não apareceu. Se aparecer
+(alguém trollando o player), o servidor já é a fonte da verdade — dá pra
+acrescentar dono sem redesenhar nada.
 
 ### Armadilhas — ler antes de codar
 
@@ -184,6 +195,29 @@ gesto. Não é opcional, é requisito do navegador.
 **4. Buffering assimétrico.** Alguém com internet ruim trava. Decisão de
 produto já tomada: **seguir em frente**, e avisar no chat que fulano está
 carregando. Esperar todos trava a sala inteira no usuário mais lento.
+
+### O que foi verificado, e o que não foi
+
+**Verificado rodando:** extração do id de todo formato de link do YouTube
+(watch, youtu.be, embed, shorts, m.youtube, com `&t=`), e rejeição de lixo
+incluindo `<script>`; a posição canônica andando sozinha no ritmo de 3s sem
+ninguém mandar nada; quem entra no meio recebendo o ponto certo; pause
+congelando de verdade (3,5s depois continuava no mesmo lugar) e parando de
+mandar batida; o fim do vídeo contando **uma** música com dois clientes
+avisando; link inválido não derrubando a conexão; a decisão de deriva em
+todas as faixas e fronteiras (< 0,5s não mexe, 0,5–2s corrige por
+velocidade em no máximo 5%, > 2s pula); e — no navegador — o player
+tocando de verdade (`estado: 1`), com a posição dele batendo com a
+canônica do servidor dentro de décimos e `playbackRate` em 1.
+
+**NÃO verificado:** duas pessoas de verdade, em máquinas diferentes,
+assistindo juntas. Todo o teste de sincronia foi feito com um navegador e
+clientes de WebSocket em Python — o que valida o servidor e a lógica, mas
+não a experiência. **É exatamente o critério de saída abaixo, e continua em
+aberto.**
+
+Também não foi testado: internet ruim de verdade (a armadilha 4 tem código,
+mas nunca viu buffering real), nem celular.
 
 ### Critério de saída
 
