@@ -14,6 +14,7 @@ from typing import Optional
 
 from fastapi import WebSocket
 
+from . import titulos
 from .protocol import Avatar, Pos, ev
 
 
@@ -193,6 +194,12 @@ class Room:
             # se tem vídeo rolando, a lista mostra — é sinal de vida tanto
             # quanto a contagem de gente
             "video": self.video.id if self.video.tocando else "",
+            # Só o que já está em cache — a lista recarrega a cada 8s e não
+            # pode disparar busca na rede a cada volta. Se ainda não sabemos,
+            # o cartão mostra o id, como antes.
+            "video_titulo": (
+                titulos.conhecido(self.video.id) if self.video.tocando else ""
+            ),
             "nicks": [u.nick for u in self.users.values()][:AMOSTRA],
             "avatares": [
                 u.avatar.model_dump() for u in self.users.values()

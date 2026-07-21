@@ -37,7 +37,9 @@ dessa reação que os avatares saíram da Etapa 3 e viraram Etapa 1.
 
 ## Onde estamos
 
-Etapa 1 concluída e testada. Lobby e lista de salas prontos. **No ar em
+Etapa 1 concluída e testada. Etapa 2 (YouTube sincronizado) com o código
+todo pronto — falta só o teste com gente de verdade, que é o critério de
+saída dela. Lobby e lista de salas prontos. **No ar em
 <https://2gether.fly.dev>.** Repositório público em
 `github.com/joaoromaodev/projeto-sem-nome`.
 
@@ -58,9 +60,12 @@ Etapa 1 concluída e testada. Lobby e lista de salas prontos. **No ar em
   guarda-roupa de até 12 looks
 - Ferramentas de gerar camadas provisórias e validar sprites
 - Deploy no Fly.io rodando, com volume persistente verificado
+- YouTube sincronizado pelo servidor, com correção de deriva; controle
+  remoto como objeto da sala; fila de vídeos; título de cada vídeo pelo
+  oEmbed, sem chave de API
 
-**Não funciona ainda:** YouTube, compartilhamento de tela, sala privada,
-histórico da sala.
+**Não funciona ainda:** compartilhamento de tela, sala privada, histórico
+da sala.
 
 **A arte atual é provisória.** `ferramentas/gerar_placeholders.py` gera
 camadas de andaime pra o sistema ficar testável. Quando os sprites de
@@ -77,7 +82,9 @@ Em ordem, quando esta sessão for retomada:
 2. **Receber as 5 camadas de arte** e validar com
    `python ferramentas/conferir_sprites.py`. O usuário estava produzindo a
    partir de uma base de 27×46 que ia expandir pra 32×48.
-3. **Etapa 2 — YouTube sincronizado.** É a maior fatia de trabalho restante.
+3. **Etapa 5 — a sala persistente.** Com a Etapa 2 fechada em código, esta
+   passou a ser a maior fatia de trabalho restante, e é a que fecha a tese.
+   A Etapa 4 (WebRTC) segue por último de propósito.
 
 ### O que foi verificado, e o que não foi
 
@@ -134,6 +141,8 @@ Não reabrir sem motivo novo.
 | **Sem controles nativos do YouTube** | `controls: 0`, mais um escudo transparente sobre o iframe pra quem não está com o controle. Sem isso os botões do próprio YouTube dariam play e pause a qualquer um, passando por cima do controle remoto e dessincronizando a sala. |
 | **Quem sai larga o controle** | Se o controle sumisse com quem fechou a aba, a sala ficaria travada sem ninguém podendo mexer no vídeo. Ele cai no chão na posição de quem saiu. |
 | **Sala privada depende de persistência** | Sala privada precisa de dono, e dono precisa sobreviver ao restart. Hoje `Room` vive num dict em memória: reiniciou, evaporou o dono junto. Por isso o item foi empurrado pra depois da Etapa 5, e não improvisado agora. |
+| **Título por oEmbed, não pela YouTube Data API** | O plano pedia a API de dados, que exigiria projeto no Google Cloud, chave, secret no Fly e cota diária — quatro peças pra manter por causa de um texto. O oEmbed do próprio YouTube (`youtube.com/oembed`) devolve o título por URL pública, sem nada disso. O preço é não responder por vídeo privado, apagado ou sem embed; nesses casos o título sai vazio e a tela mostra o id, que é exatamente o que ela mostrava antes. Degrada pro comportamento antigo em vez de quebrar. |
+| **O título nunca segura o vídeo** | A busca é `create_task` e o título chega numa mensagem própria, depois. Esperar um GET pro YouTube antes de dar play atrasaria a sala inteira por causa de um rótulo — trocaria sincronia, que é a coisa difícil do projeto, por enfeite. Pelo mesmo motivo o `bemvindo` só manda o que já está em cache. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 
 ---
@@ -166,9 +175,9 @@ posição esperada e corrigem a sua.
 - [x] Contador `musicas_ouvidas` da sala, com guarda contra contar N vezes
       (o fim do vídeo dispara no player de todo mundo quase junto)
 - [x] Quem entra no meio do vídeo já cai no ponto certo
-- [ ] Fila de vídeos por sala (adicionar, remover, pular)
-- [ ] Título do vídeo (hoje aparece só o id; exige a API de dados do
-      YouTube, que precisa de chave)
+- [x] Título do vídeo — resolvido pelo **oEmbed**, sem chave de API (ver
+      decisão travada). Aparece na linha do que está tocando, em cada item
+      da fila e no cartão da sala no lobby
 
 - [x] **Controle remoto como objeto da sala** — resolveu o "papel de host"
       do plano original, e melhor: em vez de um cargo invisível numa caixa
@@ -215,6 +224,22 @@ todas as faixas e fronteiras (< 0,5s não mexe, 0,5–2s corrige por
 velocidade em no máximo 5%, > 2s pula); e — no navegador — o player
 tocando de verdade (`estado: 1`), com a posição dele batendo com a
 canônica do servidor dentro de décimos e `playbackRate` em 1.
+
+**Verificado nos títulos:** o oEmbed respondendo (uma leva de 4 ids em
+0,65s, cache depois em 0μs); id inválido voltando vazio, entrando no cache
+como vazio — sem isto um vídeo apagado na fila renderia busca nova a cada
+repintura — e sem derrubar a conexão; o `video_trocou` chegando **antes**
+do `titulos`, que é a prova de que o vídeo não espera o rótulo; quem entra
+depois recebendo os títulos já no `bemvindo` em 0,000s; e no navegador, a
+fila mostrando "Me at the zoo" e caindo no id cru pro vídeo inexistente.
+
+**Bug achado nesse teste:** a linha do que está tocando não tinha
+`white-space: nowrap`. Com a palavra "tocando" era sempre uma linha; com
+título de tamanho imprevisível virou três (30,6px) e empurrava a fila pra
+fora da coluna de 260px. É a pendência "não cabe na tela" aparecendo de
+novo, e pelo mesmo motivo: **componente dimensionado pelo conteúdo dentro
+de coluna de largura fixa.** Corrigido com reticências, e o título inteiro
+continua no `title` do elemento.
 
 **NÃO verificado:** duas pessoas de verdade, em máquinas diferentes,
 assistindo juntas. Todo o teste de sincronia foi feito com um navegador e

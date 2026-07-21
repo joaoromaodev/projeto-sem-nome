@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 from starlette.websockets import WebSocketDisconnect
 
-from . import db
+from . import db, titulos
 from .protocol import (Avatar, AvatarIn, ChatIn, ControlePegarIn,
                        ControleSoltarIn, FilaPorIn, FilaTirarIn, MoveIn,
                        NickIn, PingIn, Pos, VideoFimIn, VideoPauseIn,
@@ -334,6 +334,39 @@ async def _avisar(ws: WebSocket, texto: str) -> None:
         pass
 
 
+# O event loop só guarda referência fraca das tarefas: uma tarefa solta
+# pode ser coletada no meio do caminho e o título nunca chegaria — e seria
+# um bug intermitente, do tipo que não se reproduz testando.
+_buscas: set[asyncio.Task] = set()
+
+
+def _pedir_titulos(room, *vids: str) -> None:
+    """Descobre o título desses vídeos e conta pra sala, sem segurar ninguém.
+
+    É `create_task` de propósito: quem chamou está no meio de trocar o
+    vídeo, e esperar um GET pro YouTube atrasaria o play de todo mundo por
+    causa de um texto. O vídeo entra na hora com o id; o título chega
+    depois e o cliente troca o rótulo no lugar.
+    """
+    faltam = [v for v in vids if v and not titulos.conhecido(v)]
+    if not faltam:
+        return
+
+    async def _correr():
+        achados = await titulos.de_varios(faltam)
+        if achados and room.users:
+            await room.broadcast(ev("titulos", titulos=achados))
+
+    t = asyncio.create_task(_correr())
+    _buscas.add(t)
+    t.add_done_callback(_buscas.discard)
+
+
+def _titulos_conhecidos(*vids: str) -> dict[str, str]:
+    """O que já está em cache, sem ir na rede. Pro `bemvindo`."""
+    return {v: t for v in vids if v and (t := titulos.conhecido(v))}
+
+
 async def _passar_adiante(room, quem: str) -> None:
     """Puxa o próximo da fila. Se a fila secou, para e avisa."""
     prox = room.proximo()
@@ -344,6 +377,7 @@ async def _passar_adiante(room, quem: str) -> None:
         # fila": quem apertou pular não colocou nada, a fila é que andou.
         await room.broadcast(ev("video_trocou", **room.video.estado(), daFila=True))
         await room.broadcast(ev("fila", fila=room.fila, por="", novo=""))
+        _pedir_titulos(room, prox)
     else:
         room.video = Video()
         await room.broadcast(ev("video_trocou", **room.video.estado()))
@@ -386,9 +420,14 @@ async def ws_sala(ws: WebSocket, code: str):
             # de começar do zero e ser puxado pela primeira batida.
             video=room.video.estado(),
             fila=room.fila,
+            # Só o que já está em cache: quem acabou de entrar não pode
+            # esperar um GET pro YouTube pra ver a sala aparecer. O que
+            # faltar chega pelo `titulos` logo em seguida.
+            titulos=_titulos_conhecidos(room.video.id, *room.fila),
             controle=room.controle_estado(),
         ))
         await room.broadcast(ev("entrou", user=user.publico()), exceto=uid)
+        _pedir_titulos(room, room.video.id, *room.fila)
 
         while True:
             msg = parse(await ws.receive_json())
@@ -465,6 +504,7 @@ async def ws_sala(ws: WebSocket, code: str):
                     await room.broadcast(ev(
                         "fila", fila=room.fila, por=user.nick, novo=msg.video
                     ))
+                _pedir_titulos(room, msg.video)
 
             elif isinstance(msg, FilaTirarIn):
                 if msg.video in room.fila:
@@ -481,6 +521,7 @@ async def ws_sala(ws: WebSocket, code: str):
                 # escreve a linha no chat. Mandar um "sistema" junto fazia
                 # a mensagem aparecer duas vezes.
                 await room.broadcast(ev("video_trocou", **room.video.estado()))
+                _pedir_titulos(room, msg.video)
 
             elif isinstance(msg, VideoPularIn):
                 if not _pode(room, uid, ws):

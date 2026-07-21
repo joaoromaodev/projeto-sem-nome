@@ -40,6 +40,8 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
 - **Controle remoto** — fica no chão da sala; quem pega manda no play,
   pause, avançar e pular, e devolve quando quiser
 - **Fila de vídeos** — qualquer um põe, e o próximo entra sozinho
+- **Título de cada vídeo** — na fila, no que está tocando e no cartão da
+  sala no lobby, resolvido sem chave de API
 
 ## O que ainda não
 
@@ -104,6 +106,18 @@ O controle existe pra duas pessoas não brigarem pelo play/pause, não pra
 alguém decidir o que a sala assiste. Se a fila exigisse o controle, quem o
 pegasse viraria porteiro — e todo mundo empilhando música é justamente a
 graça.
+
+**O título do vídeo sai do oEmbed, não da API do YouTube.**
+A rota óbvia seria a YouTube Data API, que custaria um projeto no Google
+Cloud, uma chave, um secret no servidor e uma cota diária — quatro peças
+pra manter por causa de um texto. O `youtube.com/oembed` devolve o título
+por URL pública, sem nenhuma delas. Quando ele não responde (vídeo privado,
+apagado, sem embed) a tela mostra o id, que é o que ela mostrava antes:
+degrada pro comportamento antigo em vez de quebrar.
+
+E a busca nunca segura o vídeo — ela roda em paralelo e o título chega numa
+mensagem depois. Esperar um GET pro YouTube antes de dar play atrasaria a
+sala inteira por causa de um rótulo, trocando sincronia por enfeite.
 
 **A lista de salas mostra presença, não nota.**
 Chegou a ser considerado um sistema de avaliação das salas, e foi descartado.

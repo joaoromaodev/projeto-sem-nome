@@ -327,6 +327,17 @@ async function garantirPlayer() {
 
 function estadoVideo(txt) {
   $("#estadovideo").textContent = txt;
+  $("#estadovideo").title = txt;
+}
+
+/* Reescreve a linha do vídeo com o que sabemos agora. Existe separado
+   porque o título chega depois do vídeo começar: quando ele cair, é isto
+   que troca o id pelo nome sem mexer no player. */
+function pintarAgora() {
+  if (!ultimoEstado || !ultimoEstado.id) return;
+  if (!video.estaLiberado()) return;   // a tela de clique manda na linha
+  const nome = rotulo(ultimoEstado.id);
+  estadoVideo(`${nome} — ${ultimoEstado.tocando ? "tocando" : "pausado"}`);
 }
 
 async function mostrarVideo(est) {
@@ -342,7 +353,7 @@ async function mostrarVideo(est) {
     return;
   }
   video.aplicar(est);
-  estadoVideo(est.tocando ? "tocando" : "pausado");
+  pintarAgora();
 }
 
 $("#liberar").onclick = async () => {
@@ -375,6 +386,11 @@ $("#link").addEventListener("keydown", (e) => { if (e.key === "Enter") porVideo(
 let controleDe = "";           // uid de quem está com ele ("" = no chão)
 let controlePos = { x: 50, y: 80 };
 let filaAtual = [];
+// id do vídeo -> título, resolvido pelo servidor. Chega depois do vídeo,
+// então tudo que mostra vídeo tem que aguentar não ter título ainda e
+// cair no id — que é o que a sala mostrava antes disto existir.
+const titulos = {};
+const rotulo = (id) => titulos[id] || id;
 let elControleChao = null;
 
 const euMando = () => controleDe && controleDe === meuUid;
@@ -459,7 +475,8 @@ function pintarFila() {
     const el = document.createElement("div");
     const qual = document.createElement("span");
     qual.className = "qual";
-    qual.textContent = `${i + 1}. ${id}`;
+    qual.textContent = `${i + 1}. ${rotulo(id)}`;
+    qual.title = rotulo(id);
     const x = document.createElement("span");
     x.className = "tirar";
     x.textContent = "✕";
@@ -613,6 +630,9 @@ function receber(m) {
       $("#titulo").textContent = "■ sala :: " + codigoReal;
       sistema(`você entrou em "${codigoReal}"`);
       pintarLista();
+      // Os títulos entram antes de qualquer coisa que mostre vídeo, senão
+      // a primeira pintura sai com os ids.
+      Object.assign(titulos, m.titulos || {});
       // Quem chega no meio do filme já entra no ponto certo.
       if (m.video && m.video.id) mostrarVideo(m.video);
       if (m.controle) {
@@ -682,6 +702,15 @@ function receber(m) {
       filaAtual = m.fila || [];
       pintarFila();
       if (m.novo && m.por) sistema(`${m.por} pôs um vídeo na fila`);
+      break;
+
+    // Os títulos chegam soltos, depois do vídeo. Só repintamos rótulo —
+    // nada aqui toca no player, senão um texto atrasado dessincronizaria
+    // a sala, que é o problema que o projeto inteiro tenta evitar.
+    case "titulos":
+      Object.assign(titulos, m.titulos || {});
+      pintarFila();
+      pintarAgora();
       break;
 
     case "video_estado":

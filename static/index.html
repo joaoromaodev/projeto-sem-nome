@@ -194,6 +194,16 @@ function cartao(s) {
     : (s.lobby ? "ninguém ainda — seja o primeiro" : "vazia");
   nomes.append(cod, quem);
 
+  // O que está tocando é sinal de vida tanto quanto a contagem de gente —
+  // mas só com o título. O id cru ("dQw4w9WgXcQ") não diz nada pra quem
+  // olha a lista, então nesse caso é melhor não ocupar a linha.
+  if (s.video_titulo) {
+    const toca = document.createElement("div");
+    toca.className = "quem2 dim";
+    toca.textContent = "♪ " + s.video_titulo;
+    nomes.appendChild(toca);
+  }
+
   const conta2 = document.createElement("div");
   conta2.className = "conta2 dim";
   conta2.textContent = `${s.gente}/${s.limite}`;

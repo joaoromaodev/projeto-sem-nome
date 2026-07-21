@@ -62,8 +62,13 @@
   }
   .linhavideo { display: flex; gap: 5px; padding: 5px; }
   #link { flex: 1; min-width: 0; }
+  /* Uma linha só. Desde que aqui aparece o título e não mais a palavra
+     "tocando", o texto passou a ter tamanho imprevisível — sem isto um
+     nome comprido vira 3 ou 4 linhas e empurra a fila pra fora da coluna.
+     O título inteiro continua acessível no `title` do elemento. */
   #estadovideo {
     font-size: 10px; padding: 0 6px 5px; min-height: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
   /* Escudo sobre o iframe pra quem não está com o controle. Sem ele, os
