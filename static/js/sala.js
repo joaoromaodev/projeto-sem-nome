@@ -437,14 +437,26 @@ function barramento() {
 }
 
 function tocarBuzina() {
+  destravarAudio();
+  if (!audio) return;
+
+  const agora = performance.now();
+  if (agora - ultimaBuzinaTocada < BUZINA_MIN_MS) return;
+  ultimaBuzinaTocada = agora;
+
+  /* Contexto suspenso não anda o relógio: `currentTime` fica parado.
+     Se montarmos o som agora, agendamos tudo num instante que já terá
+     passado quando ele voltar — e aí não sai barulho nenhum, sem erro
+     nenhum no console. Por isso esperamos o resume antes de tocar. */
+  if (audio.state === "suspended") {
+    audio.resume().then(soar).catch(() => {});
+  } else {
+    soar();
+  }
+}
+
+function soar() {
   try {
-    destravarAudio();
-    if (!audio) return;
-
-    const agora = performance.now();
-    if (agora - ultimaBuzinaTocada < BUZINA_MIN_MS) return;
-    ultimaBuzinaTocada = agora;
-
     const t0 = audio.currentTime;
     const DUR = 0.75;
 

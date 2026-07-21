@@ -168,10 +168,12 @@ Não reabrir sem motivo novo.
 | **A janela é deslizante, não um contador que zera** | Com contador zerando a cada 40s, quem gastasse as 10 no fim de uma janela ganharia mais 10 no começo da seguinte — 20 buzinas seguidas, exatamente o que o teto existe pra impedir. Com janela deslizante cada buzina caduca 40s depois da sua vez, e o limite vale em qualquer trecho de 40s que se olhe. Quando barra, a mensagem diz **quantos segundos faltam** — sem o número, quem foi barrado fica martelando o botão pra descobrir. |
 | **O som é sintetizado, não é arquivo** | Nada pra baixar, nada pra licenciar, nada pra versionar — e o toque é ajustável mexendo em número. A corneta são duas vozes numa quarta justa (Mib e Láb, a razão 1.333 das buzinas de duas bocas), cada uma dobrada e desafinada em 3,5 Hz pra dar o batimento áspero que soa a instrumento, tudo passando por um passa-baixa que abre no ataque e fecha no fim, imitando a boca respondendo ao sopro. Uma nota só soaria despertador; sem o desafino, sintetizador barato. |
 | **O áudio passa por um limitador** | Medido: a corneta no ganho original estourava sozinha (pico 1,63, com 55 amostras ceifadas) — e som ceifado é exatamente o chiado que faz sintetizado soar ruim. Baixar o ganho resolveria uma buzina, mas não a rajada: elas duram 0,75s e várias se sobrepõem, somando amplitude. Baixar o bastante pra aguentar dez deixaria uma sozinha fraca demais, que é o caso comum. Um `DynamicsCompressor` na saída resolve os dois — verificado com 1, 4 e 10 sobrepostas: picos 0,88 / 0,92 / 0,95, nenhuma amostra estourada. |
+| **A buzina espera o áudio acordar antes de tocar** | Contexto de áudio suspenso não anda o relógio: `currentTime` fica parado. Montar o som nesse estado agenda tudo num instante que já passou quando ele volta — e o resultado é **silêncio sem erro nenhum no console**, que é o pior tipo de falha pra diagnosticar. Por isso, se o contexto estiver suspenso, esperamos o `resume` e só então montamos. |
 | **A buzina pisca o título além de tocar** | Só o som não resolve: metade do caso de uso é quem está com o volume baixo ou o fone tirado, e só enxerga a barra de abas. O som chama quem escuta; o título piscando chama quem só olha. Ele volta ao normal assim que a pessoa foca a aba, e desiste sozinho depois de 25s. |
 | **Volume é de cada um e não passa pelo servidor** | É o único ajuste do vídeo que não exige o controle remoto. Play, pause e seek mudam o que a sala inteira vê, e por isso são disputa; volume só mexe no ouvido de quem mexeu. Quem está de fone no escritório não deveria pedir licença pra abaixar — nem estourar o som dos outros ao ajustar o seu. Fica guardado no `localStorage` porque quem abaixou por estar no trabalho vai querer baixo na próxima também. |
 | **Mudo usa `mute()`, não volume 0** | Em 0 o YouTube ainda deixa passar um fiapo de som em alguns navegadores. Além disso `mute()` preserva o nível anterior, então voltar do mudo devolve o volume que a pessoa tinha escolhido em vez de chutar 100. |
-| **Estático vai com `Cache-Control: no-cache`** | O `StaticFiles` responde sem nenhum cabeçalho de cache, e aí o navegador decide por heurística quanto guardar — o que significa que **um deploy pode não chegar em quem já visitou o site**: a pessoa fica com o JS antigo falando com o servidor novo. Custou uma investigação pra achar (um `export` novo do `video.js` simplesmente não existia no navegador, embora o servidor já o entregasse). `no-cache` não é "não guarde", é "guarde mas pergunte antes de usar" — e com o ETag que já vinha, a pergunta volta 304 sem corpo. |
+| **O endereço do código carrega a versão** | `/v/<hash>/js/sala.js`, com o hash tirado do conteúdo dos `.js` e `.css`. Mudou o código, muda o endereço — e não existe cópia velha daquele endereço pra o navegador reusar. O arquivo então pode ir com `immutable` e cache eterno, sem risco. **Só o `no-cache` não bastava**: ele vale das respostas dali pra frente, e quem já tinha cópia guardada continuava com ela até vencer. O detalhe que faz a solução ser barata: os `import` dos nossos `.js` são **relativos**, então versionar o ponto de entrada versiona a árvore toda sozinho, sem tocar em nenhum import. |
+| **As páginas HTML vão com `no-cache`** | Elas são o mapa que aponta pros endereços versionados; mapa velho levaria de volta ao código velho. Isso estava faltando: as páginas são servidas por `FileResponse` direto nas rotas e **não passavam pelo `StaticFiles`**, então a correção de cache anterior não as alcançava. |
 | **"Está digitando" não carrega texto** | Só um liga/desliga. Mandar o que a pessoa escreve antes de ela apertar enter vazaria rascunho — inclusive o que ela escreveu, pensou melhor e apagou. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 
@@ -619,6 +621,18 @@ Todos apareceram rodando, nenhum aparecia lendo o código:
 - **Cache do navegador em `file://` e no preview engana.** Já aconteceu de
   edição de CSS parecer não ter efeito. Forçar render limpo antes de concluir
   que algo não funcionou.
+- **⚠ Deploy que chega pela metade é o bug mais traiçoeiro que este
+  projeto teve.** Aconteceu de verdade: recurso novo no ar, servidor
+  entregando o arquivo certo, e na tela o botão existindo e não fazendo
+  nada. O navegador revalida o documento principal quando a pessoa
+  recarrega, mas reusa os subrecursos do cache — dava **HTML novo com
+  `sala.js` velho**. Não aparece em nenhum teste local, porque local o
+  cache está sempre quente com o código atual. Agora o endereço do código
+  carrega o hash do conteúdo (ver decisões travadas), o que fecha a porta.
+  **Se um recurso novo "não funciona" pra alguém mas funciona pra você, a
+  primeira suspeita é essa** — e o jeito rápido de confirmar é pedir o
+  resultado de `typeof window.sala` no console: `"undefined"` significa
+  código velho.
 - **PowerShell expande `*` em argumento.** Passar `--forwarded-allow-ips '*'`
   quebra; usar a variável de ambiente `FORWARDED_ALLOW_IPS` no lugar.
 - **`flyctl ssh console -C` quebra o comando por espaço.** Não adianta

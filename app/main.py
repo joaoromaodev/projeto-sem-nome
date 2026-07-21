@@ -2,6 +2,7 @@
 
 import asyncio
 import contextlib
+import hashlib
 import json
 import time
 import uuid
@@ -9,7 +10,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, WebSocket
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 from starlette.websockets import WebSocketDisconnect
@@ -108,26 +109,97 @@ def _marcar_tentativa(ip: str) -> None:
 
 
 # ------------------------------------------------------------------ páginas
+#
+# Sobre o cache do código, que já custou um bug feio: um deploy chegava
+# pela metade. O navegador revalida o documento principal quando a pessoa
+# recarrega, mas reusa os subrecursos do cache — então dava HTML novo com
+# `sala.js` velho. Na tela isso aparece como botão que existe e não faz
+# nada, e é impossível de adivinhar olhando o código: no servidor está
+# tudo certo.
+#
+# `Cache-Control: no-cache` no JS sozinho não resolvia, porque só vale das
+# respostas dali pra frente — quem já tinha uma cópia guardada continuava
+# com ela até ela vencer.
+#
+# A solução é o endereço carregar a versão: `/v/<hash>/js/sala.js`. Se o
+# conteúdo muda, o hash muda, o endereço muda, e não existe cópia velha
+# pra reusar — o navegador é obrigado a buscar. E como o endereço é único
+# por conteúdo, o arquivo pode ser guardado pra sempre sem risco.
+#
+# O detalhe que faz isso valer a pena: os `import` dentro dos nossos .js
+# são relativos, então `/v/abc/js/sala.js` importando "./video.js" já
+# busca `/v/abc/js/video.js` sozinho. Versionar o ponto de entrada
+# versiona a árvore inteira, sem tocar em nenhum import.
+
+def _versao_estatico() -> str:
+    """Impressão digital do código do cliente.
+
+    Muda quando (e só quando) algum .js ou .css muda. Não usamos data de
+    build nem hora de boot: as duas mudariam sem o conteúdo mudar, e cada
+    restart do Fly obrigaria todo mundo a rebaixar tudo à toa.
+    """
+    h = hashlib.sha256()
+    arquivos = sorted((ESTATICO / "js").rglob("*.js"))
+    arquivos += sorted((ESTATICO / "css").rglob("*.css"))
+    for p in arquivos:
+        h.update(p.name.encode())
+        h.update(p.read_bytes())
+    return h.hexdigest()[:10]
+
+
+VERSAO = _versao_estatico()
+
+
+def _pagina(nome: str) -> HTMLResponse:
+    """Serve uma página trocando `__VER__` pela versão do código.
+
+    A página em si vai com `no-cache`: ela é o mapa que aponta pros
+    endereços versionados, e um mapa velho levaria justamente ao código
+    velho que queremos evitar.
+    """
+    html = (ESTATICO / nome).read_text(encoding="utf-8")
+    return HTMLResponse(
+        html.replace("__VER__", VERSAO),
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
+@app.get("/v/{versao}/{caminho:path}")
+async def estatico_versionado(versao: str, caminho: str):
+    """Código do cliente num endereço que carrega a versão.
+
+    Guardar pra sempre é seguro aqui justamente porque o endereço muda
+    junto com o conteúdo: nunca existe "a versão velha deste endereço".
+    """
+    alvo = (ESTATICO / caminho).resolve()
+    # o de sempre: impedir que "../.." saia da pasta de estáticos
+    if not alvo.is_file() or ESTATICO.resolve() not in alvo.parents:
+        raise HTTPException(404)
+    return FileResponse(
+        alvo,
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
+
 
 @app.get("/entrar")
 async def pag_entrar(request: Request):
     if usuario_opcional(request):
         return RedirectResponse("/", 302)
-    return FileResponse(ESTATICO / "entrar.html")
+    return _pagina("entrar.html")
 
 
 @app.get("/")
 async def pag_home(request: Request):
     if not usuario_opcional(request):
         return RedirectResponse("/entrar", 302)
-    return FileResponse(ESTATICO / "index.html")
+    return _pagina("index.html")
 
 
 @app.get("/sala/{code}")
 async def pag_sala(request: Request, code: str):
     if not usuario_opcional(request):
         return RedirectResponse("/entrar", 302)
-    return FileResponse(ESTATICO / "sala.html")
+    return _pagina("sala.html")
 
 
 # ------------------------------------------------------------------ conta
