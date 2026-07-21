@@ -36,6 +36,8 @@ _tentativas: dict[str, list[float]] = defaultdict(list)
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     db.iniciar()
+    # Depois do banco, nunca antes: montar uma sala hoje grava nela.
+    manager.iniciar()
     tarefas = [
         asyncio.create_task(_housekeeping()),
         asyncio.create_task(_batida_video()),
@@ -325,6 +327,26 @@ async def salas(u: dict = Depends(usuario)):
     return {"salas": manager.listar(), "lobby": LOBBY}
 
 
+@app.get("/api/minhas-salas")
+async def minhas_salas(u: dict = Depends(usuario)):
+    """As salas que você frequenta — inclusive as que estão vazias agora.
+
+    A lista de cima só mostra sala com gente dentro, e isso é proposital:
+    entrar num lugar deserto e sair é a pior primeira impressão. Mas a
+    **sua** sala vazia é outra coisa: você sabe o que é aquilo e pode
+    querer abrir justamente pra ser o primeiro. Por isso as duas listas
+    existem, com regras diferentes.
+
+    O `gente` vem da memória, que é onde a presença mora; a sala que não
+    está carregada no momento simplesmente tem zero.
+    """
+    salas = db.minhas_salas(u["id"])
+    for s in salas:
+        room = manager.rooms.get(s["code"])
+        s["gente"] = len(room.users) if room else 0
+    return {"salas": salas}
+
+
 # ------------------------------------------------------------- peças
 
 CAMADAS = ["pele", "pernas", "sapatos", "torso", "cabelo"]
@@ -426,7 +448,12 @@ def _pedir_titulos(room, *vids: str) -> None:
 
     async def _correr():
         achados = await titulos.de_varios(faltam)
-        if achados and room.users:
+        if not achados:
+            return
+        # O histórico grava a linha na hora que o vídeo entra, quando o
+        # título ainda não existe. Aqui é onde ele é completado.
+        db.sala_titular(achados)
+        if room.users:
             await room.broadcast(ev("titulos", titulos=achados))
 
     t = asyncio.create_task(_correr())
@@ -445,6 +472,7 @@ async def _passar_adiante(room, quem: str) -> None:
     if prox:
         room.video = Video(id=prox, tocando=True, por=quem)
         room.video.marcar(0.0, tocando=True)
+        room.anotar_video(prox, quem)
         # `daFila` separa "fulano colocou um vídeo" de "entrou o próximo da
         # fila": quem apertou pular não colocou nada, a fila é que andou.
         await room.broadcast(ev("video_trocou", **room.video.estado(), daFila=True))
@@ -464,7 +492,10 @@ async def ws_sala(ws: WebSocket, code: str):
         return
 
     await ws.accept()
-    room = manager.get(code)
+    # Quem chega primeiro numa sala que ainda não existe vira dono dela.
+    # Não muda nada hoje; é o gancho da sala privada por convite, que só
+    # é possível agora que o dono sobrevive ao restart.
+    room = manager.get(code, dono=conta["id"])
     uid = uuid.uuid4().hex[:8]
     user: User | None = None
 
@@ -487,11 +518,21 @@ async def ws_sala(ws: WebSocket, code: str):
             conta=conta["id"],
         )
         await room.add(user)
+        # Só depois de a entrada dar certo: sala cheia não é visita.
+        db.sala_visitou(room.code, conta["id"])
 
         await ws.send_json(ev(
             "bemvindo",
             eu=user.publico(),
-            sala={"code": room.code, "musicas": room.musicas_ouvidas},
+            sala={
+                "code": room.code,
+                "musicas": room.musicas_ouvidas,
+                # Quem frequenta e o que já rolou. É isto que faz a sala
+                # ter cara de lugar conhecido em vez de tela em branco —
+                # inclusive pra quem chega e não tem mais ninguém online.
+                "membros": db.sala_membros(room.code),
+                "historico": db.sala_historico(room.code),
+            },
             gente=room.roster(),
             # Quem chega no meio do filme já entra no ponto certo, em vez
             # de começar do zero e ser puxado pela primeira batida.
@@ -599,6 +640,7 @@ async def ws_sala(ws: WebSocket, code: str):
                     # Nada tocando: entra direto, sem passar pela fila.
                     room.video = Video(id=msg.video, tocando=True, por=user.nick)
                     room.video.marcar(0.0, tocando=True)
+                    room.anotar_video(msg.video, user.nick)
                     await room.broadcast(ev("video_trocou", **room.video.estado()))
                 else:
                     room.fila.append(msg.video)
@@ -618,6 +660,7 @@ async def ws_sala(ws: WebSocket, code: str):
                     continue
                 room.video = Video(id=msg.video, tocando=True, por=user.nick)
                 room.video.marcar(0.0, tocando=True)
+                room.anotar_video(msg.video, user.nick)
                 # Só `video_trocou`: ele já carrega o `por`, e o cliente
                 # escreve a linha no chat. Mandar um "sistema" junto fazia
                 # a mensagem aparecer duas vezes.

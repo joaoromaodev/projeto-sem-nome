@@ -53,6 +53,20 @@
   .caras canvas { image-rendering: pixelated; margin-right: -10px; }
   .caras canvas:last-child { margin-right: 0; }
   .vazio { font-size: 11px; padding: 6px 4px; }
+  /* "suas salas" é atalho, não catálogo: linha compacta, sem bonequinho.
+     Quem já frequenta o lugar não precisa que a lista o descreva. */
+  #minhas { max-height: 118px; overflow-y: auto; }
+  .minha {
+    display: flex; align-items: baseline; gap: 6px;
+    padding: 3px 5px; cursor: pointer;
+  }
+  .minha:hover { background: #000080; color: #fff; }
+  .minha:hover .dim { color: #c8c8e0; }
+  .minha .cod { font-weight: bold; font-size: 12px; flex: 1; min-width: 0;
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .minha .sinal { font-size: 10px; flex: none; }
+  .minha .sinal.acesa { color: #060; font-weight: bold; }
+  .minha:hover .sinal.acesa { color: #7f7; }
 </style>
 </head>
 <body>
@@ -76,7 +90,12 @@
       </fieldset>
 
       <div>
-        <fieldset>
+        <fieldset id="boxMinhas" hidden>
+          <legend>Suas salas</legend>
+          <div id="minhas"></div>
+        </fieldset>
+
+        <fieldset style="margin-top:14px;">
           <legend>Onde tem gente agora</legend>
           <div id="salas"><p class="dim vazio">carregando...</p></div>
         </fieldset>
@@ -222,11 +241,55 @@ async function carregarSalas() {
   for (const s of dados.salas) alvo.appendChild(cartao(s));
 }
 
-await carregarSalas();
+/* ---------- suas salas ----------
+   A lista de cima é descoberta ("onde tem gente?"); esta é retorno
+   ("cadê o meu lugar?"). São perguntas diferentes, então listas
+   diferentes: aqui entra sala vazia, porque a sua sala vazia é um lugar
+   que você conhece e pode querer abrir pra ser o primeiro. */
+
+function linhaMinha(s) {
+  const el = document.createElement("div");
+  el.className = "minha";
+  el.title = `entrar em "${s.code}"`;
+
+  const cod = document.createElement("span");
+  cod.className = "cod";
+  cod.textContent = s.code;
+
+  const sinal = document.createElement("span");
+  sinal.className = "sinal dim" + (s.gente ? " acesa" : "");
+  // Sala vazia mostra o que já tocou ali: é o que resta de sinal de vida
+  // quando não tem ninguém, e é justamente o que a sala guardou por você.
+  const n = s.musicas_ouvidas;
+  sinal.textContent = s.gente
+    ? `${s.gente} online`
+    : (n ? `${n} música${n === 1 ? "" : "s"}` : "vazia");
+
+  el.append(cod, sinal);
+  el.onclick = () => irPara(s.code);
+  return el;
+}
+
+async function carregarMinhas() {
+  let dados;
+  try { dados = await api.minhasSalas(); } catch { return; }
+
+  // Quem nunca entrou em nada não precisa de um quadro vazio dizendo
+  // isso — some até ter o que mostrar.
+  $("#boxMinhas").hidden = dados.salas.length === 0;
+  const alvo = $("#minhas");
+  alvo.textContent = "";
+  for (const s of dados.salas) alvo.appendChild(linhaMinha(s));
+}
+
+await Promise.all([carregarSalas(), carregarMinhas()]);
 // A lista envelhece rápido (gente entra e sai). Recarrega enquanto a aba
 // está à vista; em aba oculta não adianta gastar requisição.
 setInterval(() => {
-  if (document.visibilityState === "visible") carregarSalas();
+  if (document.visibilityState === "visible") {
+    carregarSalas();
+    carregarMinhas();
+  }
 }, 8000);
 
 /* ---------- conta ---------- */

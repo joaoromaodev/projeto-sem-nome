@@ -1,9 +1,18 @@
 """Salas e quem está dentro delas.
 
-Estado mora em memória: reiniciou o servidor, esvaziou tudo. Pro MVP isso
-basta — a sala persistente que o plano promete vem quando existir banco.
-O que já é permanente aqui é o *código* da sala: ele é derivado do nome,
-então "quinta-a-noite" sempre cai no mesmo lugar.
+A divisão aqui é entre **presença** e **memória**, e ela não é arbitrária:
+
+- Quem está dentro agora, onde cada boneco está, quem segurou o controle,
+  o que toca neste segundo — tudo isso mora **em memória**. É estado de
+  agora; guardar no banco só criaria gente fantasma sobrevivendo a um
+  crash.
+- Quem é o dono, quanto já tocou ali, o que já rolou e quem frequenta —
+  isso mora **no banco** (`db.py`). É o que faz a sala ser um lugar e não
+  um link: no Fly a máquina dorme quando não tem ninguém, e sem isso a
+  sala perderia a história inteira toda vez que isso acontecesse.
+
+O código da sala é derivado do nome, então "quinta-a-noite" sempre cai no
+mesmo lugar — é ele a chave dos dois lados.
 """
 
 import asyncio
@@ -14,7 +23,7 @@ from typing import Optional
 
 from fastapi import WebSocket
 
-from . import titulos
+from . import db, titulos
 from .protocol import Avatar, Pos, ev
 
 
@@ -106,13 +115,19 @@ class User:
 
 
 class Room:
-    def __init__(self, code: str):
+    def __init__(self, code: str, dono: Optional[int] = None):
         self.code = code
         self.users: dict[str, User] = {}
         self.criada_em = time.time()
-        self.musicas_ouvidas = 0
         self.video = Video()
         self.fila: list[str] = []
+
+        # A sala pode existir no banco há meses e estar aparecendo em
+        # memória agora só porque a máquina reiniciou. Por isso o contador
+        # vem do banco e não do zero: reiniciar não é a sala nascer.
+        linha = db.sala_registrar(code, dono)
+        self.musicas_ouvidas = linha["musicas_ouvidas"]
+        self.dono = linha["dono"]
 
         # O controle remoto é um objeto da sala, não um cargo. Ou está na
         # mão de alguém (`controle` = uid), ou está caído no chão numa
@@ -208,8 +223,21 @@ class Room:
         if not self.video.id or not self.video.tocando:
             return False
         self.video.marcar(self.video.pos, tocando=False)
-        self.musicas_ouvidas += 1
+        # O banco é quem soma, e o total volta de lá. Somar em memória e
+        # gravar depois daria dois números pra mesma coisa — e o de
+        # memória mentiria depois de qualquer restart.
+        self.musicas_ouvidas = db.sala_contar_musica(self.code)
         return True
+
+    def anotar_video(self, video: str, por: str) -> None:
+        """Guarda no histórico o que acabou de entrar na TV.
+
+        O título vai como o que já sabemos: se o oEmbed ainda não voltou,
+        fica vazio e a tela cai no id, exatamente como já faz em todo
+        canto. Esperar o rótulo pra gravar seria o mesmo erro de deixar um
+        texto segurar a sala.
+        """
+        db.sala_anotar(self.code, video, titulos.conhecido(video) or "", por)
 
     @property
     def eh_lobby(self) -> bool:
@@ -238,6 +266,9 @@ class Room:
             "gente": len(self.users),
             "limite": self.limite,
             "lobby": self.eh_lobby,
+            # O que já tocou aqui é o sinal de que a sala tem passado —
+            # e, numa sala vazia, é o único sinal que sobra.
+            "musicas": self.musicas_ouvidas,
             # se tem vídeo rolando, a lista mostra — é sinal de vida tanto
             # quanto a contagem de gente
             "video": self.video.id if self.video.tocando else "",
@@ -291,13 +322,22 @@ class Room:
 class RoomManager:
     def __init__(self):
         self.rooms: dict[str, Room] = {}
-        self.get(LOBBY)  # o lobby existe desde o boot, mesmo sem ninguém
 
-    def get(self, code: str) -> Room:
+    def iniciar(self) -> None:
+        """O lobby existe desde o boot, mesmo sem ninguém.
+
+        Isto era feito no `__init__`, e deixou de dar: montar uma sala
+        agora escreve no banco, e o `manager` é criado no import deste
+        módulo — antes de `db.iniciar()` ter criado as tabelas. Quem chama
+        é o lifespan do app, depois do banco estar de pé.
+        """
+        self.get(LOBBY)
+
+    def get(self, code: str, dono: Optional[int] = None) -> Room:
         """Sala é criada na hora que alguém tenta entrar. Sem cadastro."""
         code = slugify(code)
         if code not in self.rooms:
-            self.rooms[code] = Room(code)
+            self.rooms[code] = Room(code, dono)
         return self.rooms[code]
 
     def existe(self, code: str) -> bool:
@@ -319,10 +359,15 @@ class RoomManager:
         return vivas
 
     def limpar_vazias(self) -> int:
-        """Sala sem ninguém há mais de 1h vira lixo. Roda pelo housekeeping.
+        """Sala sem ninguém há mais de 1h sai da memória. Pelo housekeeping.
 
-        O lobby nunca entra na faxina: ele é o destino padrão, e recriá-lo
-        no próximo acesso perderia o contador da sala.
+        Isto **não apaga a sala** — ela continua inteira no banco, com
+        dono, contador, histórico e membros. O que a faxina descarta é a
+        cópia em memória, que só existe pra atender quem está online. Quem
+        voltar amanhã encontra o lugar de volta.
+
+        O lobby fica de fora mesmo assim: é o destino padrão e precisa de
+        porta visível na lista, que só mostra sala que existe em memória.
         """
         agora = time.time()
         mortas = [

@@ -588,6 +588,53 @@ function sairPara(destino) {
   location.href = destino;
 }
 
+/* --------------------------------------------------- o que a sala lembra
+ *
+ * A sala agora tem passado: o servidor guarda no banco quanto já tocou
+ * ali, o que rolou e quem frequenta. Isso vira três linhas no chat na
+ * hora que você entra, e não um painel — sala que abre com um relatório
+ * do lado vira ferramenta, e a tese aqui é que ela seja um lugar. No
+ * chat, o passado chega como alguém te contando.
+ *
+ * Nada disso aparece em sala nova: a sala sem história fica calada em
+ * vez de anunciar três zeros.
+ */
+function contarPassado(sala, quantosOnline, meuNick) {
+  if (!sala) return;
+
+  // O contador começa de onde a sala parou, não de zero: senão a primeira
+  // música da noite anunciaria "1 já tocou nesta sala" num lugar que tem
+  // trezentas.
+  musicasOuvidas = sala.musicas || 0;
+
+  if (sala.musicas) {
+    sistema(sala.musicas === 1
+      ? "1 música já tocou aqui"
+      : `${sala.musicas} músicas já tocaram aqui`);
+  }
+
+  const ultimo = (sala.historico || [])[0];
+  if (ultimo) {
+    sistema(`a última foi "${ultimo.titulo || ultimo.video}"` +
+            (ultimo.por ? `, que ${ultimo.por} colocou` : ""));
+  }
+
+  // Só quando você está sozinho. Com gente online a lista de nomes já
+  // está na tela, e repetir quem frequenta seria dizer o que se vê.
+  if (quantosOnline <= 1) {
+    // Você entra na lista de membros no mesmo instante em que abre a
+    // sala — sem tirar o seu nome, a sala te informaria que você costuma
+    // aparecer por aqui.
+    const outros = (sala.membros || [])
+      .map((m) => m.nick)
+      .filter((n) => n && n !== meuNick)
+      .slice(0, 5);
+    if (outros.length) {
+      sistema(`costumam aparecer por aqui: ${outros.join(", ")}`);
+    }
+  }
+}
+
 /* ------------------------------------------------------------ vídeo */
 
 let musicasOuvidas = 0;
@@ -987,6 +1034,7 @@ function receber(m) {
       document.title = codigoReal + " — sala";
       $("#titulo").textContent = "■ sala :: " + codigoReal;
       sistema(`você entrou em "${codigoReal}"`);
+      contarPassado(m.sala, m.gente.length, m.eu.nick);
       pintarLista();
       // Os títulos entram antes de qualquer coisa que mostre vídeo, senão
       // a primeira pintura sai com os ids.
@@ -1074,7 +1122,9 @@ function receber(m) {
     case "video_estado":
       if (typeof m.musicas === "number") {
         musicasOuvidas = m.musicas;
-        sistema(`acabou — ${musicasOuvidas} já tocaram nesta sala`);
+        sistema(musicasOuvidas === 1
+          ? "acabou — foi a primeira desta sala"
+          : `acabou — ${musicasOuvidas} já tocaram nesta sala`);
       }
       mostrarVideo(m);
       break;

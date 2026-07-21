@@ -39,6 +39,10 @@ export const api = {
   // salas com gente agora, o lobby na frente
   salas: () => pedir("GET", "/api/salas"),
 
+  // as salas que você frequenta — vêm do banco, então aparecem mesmo
+  // vazias e mesmo depois de o servidor ter reiniciado
+  minhasSalas: () => pedir("GET", "/api/minhas-salas"),
+
   verGuardaRoupa: () => pedir("GET", "/api/guarda-roupa"),
   guardarLook: (nome, avatar) => pedir("POST", "/api/guarda-roupa", { nome, avatar }),
   apagarLook: (id) => pedir("DELETE", `/api/guarda-roupa/${id}`),

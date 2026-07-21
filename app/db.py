@@ -60,6 +60,42 @@ CREATE TABLE IF NOT EXISTS guarda_roupa (
 );
 
 CREATE INDEX IF NOT EXISTS ix_guarda_usuario ON guarda_roupa(usuario);
+
+-- A sala deixou de ser só um dict em memória. O que mora aqui é o que
+-- precisa sobreviver ao restart: quem é o dono, quanto já tocou ali e
+-- desde quando existe. Quem está dentro *agora* continua em memória --
+-- presença não é passado, e guardá-la só criaria fantasma depois de um
+-- crash.
+CREATE TABLE IF NOT EXISTS salas (
+    code            TEXT PRIMARY KEY,
+    dono            INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    criada_em       REAL NOT NULL,
+    vista_em        REAL NOT NULL,
+    musicas_ouvidas INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS sala_historico (
+    id     INTEGER PRIMARY KEY,
+    code   TEXT NOT NULL REFERENCES salas(code) ON DELETE CASCADE,
+    video  TEXT NOT NULL,
+    titulo TEXT NOT NULL DEFAULT '',
+    por    TEXT NOT NULL DEFAULT '',
+    quando REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS ix_hist_sala ON sala_historico(code, quando DESC);
+
+-- Quem frequenta a sala. É daqui que sai "suas salas" no lobby e a lista
+-- de membros com o avatar apagadinho de quem está offline.
+CREATE TABLE IF NOT EXISTS sala_membros (
+    code     TEXT NOT NULL REFERENCES salas(code) ON DELETE CASCADE,
+    usuario  INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    visitas  INTEGER NOT NULL DEFAULT 0,
+    vista_em REAL NOT NULL,
+    PRIMARY KEY (code, usuario)
+);
+
+CREATE INDEX IF NOT EXISTS ix_membros_usuario ON sala_membros(usuario, vista_em DESC);
 """
 
 
@@ -236,6 +272,161 @@ def apagar_look(uid: int, look_id: int) -> bool:
         cur = c.execute("DELETE FROM guarda_roupa WHERE id = ? AND usuario = ?",
                         (look_id, uid))
         return cur.rowcount > 0
+
+
+# ------------------------------------------------------------------ salas
+#
+# Até aqui a sala vivia só num dict em memória: reiniciou o servidor,
+# evaporou tudo junto — inclusive o contador de músicas e qualquer noção
+# de quem frequentava o lugar. Isso derrubava a tese do projeto, que é a
+# sala ser um *lugar fixo* e não um link descartável. Um lugar que perde
+# a memória toda vez que a máquina do Fly dorme não é um lugar.
+
+# Quantas linhas de histórico cada sala guarda. Sem teto, uma sala que
+# roda música o dia inteiro cresce pra sempre num volume de 1GB. 200 é
+# bem mais do que alguém rola na tela e ainda cabe folgado.
+HISTORICO_MAX = 200
+
+# Quantas salas o "suas salas" mostra. Acima disso deixa de ser atalho
+# pras suas e vira outra lista de tudo.
+MINHAS_MAX = 8
+
+
+def sala_registrar(code: str, dono: Optional[int] = None) -> dict:
+    """Garante a sala no banco e marca que ela foi vista agora.
+
+    Quem chega primeiro numa sala que ainda não existe vira o dono. Isso
+    não dá poder nenhum hoje — é o gancho de que a sala privada por
+    convite precisa, e que só dá pra ter quando o dono sobrevive ao
+    restart.
+    """
+    agora = time.time()
+    with conectar() as c:
+        c.execute(
+            "INSERT INTO salas (code, dono, criada_em, vista_em) VALUES (?,?,?,?)"
+            " ON CONFLICT(code) DO UPDATE SET vista_em = excluded.vista_em",
+            (code, dono, agora, agora),
+        )
+        s = c.execute("SELECT * FROM salas WHERE code = ?", (code,)).fetchone()
+    return dict(s)
+
+
+def sala_contar_musica(code: str) -> int:
+    """Sobe o contador da sala e devolve o total. Ver `Room.video_acabou`."""
+    with conectar() as c:
+        c.execute(
+            "UPDATE salas SET musicas_ouvidas = musicas_ouvidas + 1 WHERE code = ?",
+            (code,),
+        )
+        linha = c.execute(
+            "SELECT musicas_ouvidas FROM salas WHERE code = ?", (code,)
+        ).fetchone()
+    return linha["musicas_ouvidas"] if linha else 0
+
+
+def sala_anotar(code: str, video: str, titulo: str, por: str) -> None:
+    """Registra que esse vídeo tocou aqui.
+
+    Anotamos quando o vídeo *entra*, não quando acaba: metade das músicas
+    é pulada antes do fim, e a pergunta que o histórico responde é "o que
+    já rolou nessa sala", não "o que foi ouvido inteiro".
+    """
+    if not video:
+        return
+    with conectar() as c:
+        c.execute(
+            "INSERT INTO sala_historico (code, video, titulo, por, quando)"
+            " VALUES (?,?,?,?,?)",
+            (code, video, titulo, por, time.time()),
+        )
+        # Poda na mesma transação em vez de numa faxina periódica: assim
+        # o teto vale sempre, e não só depois que o housekeeping rodar.
+        c.execute(
+            "DELETE FROM sala_historico WHERE code = ? AND id NOT IN ("
+            "  SELECT id FROM sala_historico WHERE code = ?"
+            "  ORDER BY quando DESC LIMIT ?)",
+            (code, code, HISTORICO_MAX),
+        )
+
+
+def sala_titular(titulos_novos: dict[str, str]) -> None:
+    """Preenche no histórico os títulos que só chegaram depois.
+
+    O vídeo é anotado no instante em que entra, e nesse instante o oEmbed
+    quase nunca respondeu ainda — anotar esperando o título repetiria o
+    erro de deixar um rótulo segurar a sala. Então a linha nasce com o
+    título vazio e é completada quando a busca volta.
+
+    Só preenche o que está vazio: um título já gravado é o que a sala
+    viu na época, e reescrever apagaria isso à toa.
+    """
+    pares = [(t, v) for v, t in titulos_novos.items() if v and t]
+    if not pares:
+        return
+    with conectar() as c:
+        c.executemany(
+            "UPDATE sala_historico SET titulo = ? WHERE video = ? AND titulo = ''",
+            pares,
+        )
+
+
+def sala_historico(code: str, limite: int = 30) -> list[dict]:
+    with conectar() as c:
+        linhas = c.execute(
+            "SELECT video, titulo, por, quando FROM sala_historico"
+            " WHERE code = ? ORDER BY quando DESC LIMIT ?",
+            (code, min(limite, HISTORICO_MAX)),
+        ).fetchall()
+    return [dict(l) for l in linhas]
+
+
+def sala_visitou(code: str, uid: int) -> None:
+    """Marca que essa pessoa esteve aqui. É o que alimenta 'suas salas'."""
+    with conectar() as c:
+        c.execute(
+            "INSERT INTO sala_membros (code, usuario, visitas, vista_em)"
+            " VALUES (?,?,1,?)"
+            " ON CONFLICT(code, usuario) DO UPDATE SET"
+            "   visitas = visitas + 1, vista_em = excluded.vista_em",
+            (code, uid, time.time()),
+        )
+
+
+def sala_membros(code: str, limite: int = 20) -> list[dict]:
+    """Quem frequenta a sala, do mais recente pro mais antigo.
+
+    Vai o avatar junto porque a tela desenha o boneco de cada um — quem
+    está offline aparece apagadinho, que é o que dá a sensação de a sala
+    ter gente mesmo quando está vazia.
+    """
+    with conectar() as c:
+        linhas = c.execute(
+            "SELECT u.id, u.nick, u.avatar, m.visitas, m.vista_em"
+            " FROM sala_membros m JOIN usuarios u ON u.id = m.usuario"
+            " WHERE m.code = ? ORDER BY m.vista_em DESC LIMIT ?",
+            (code, limite),
+        ).fetchall()
+    return [
+        {"id": l["id"], "nick": l["nick"], "avatar": json.loads(l["avatar"]),
+         "visitas": l["visitas"], "vista_em": l["vista_em"]}
+        for l in linhas
+    ]
+
+
+def minhas_salas(uid: int, limite: int = MINHAS_MAX) -> list[dict]:
+    """As salas que essa pessoa frequenta, da mais recente pra trás.
+
+    É o item da tese que premia o comportamento recorrente: quem volta
+    encontra o lugar de volta, em vez de ter que lembrar o nome dele.
+    """
+    with conectar() as c:
+        linhas = c.execute(
+            "SELECT m.code, m.visitas, m.vista_em, s.musicas_ouvidas"
+            " FROM sala_membros m JOIN salas s ON s.code = m.code"
+            " WHERE m.usuario = ? ORDER BY m.vista_em DESC LIMIT ?",
+            (uid, limite),
+        ).fetchall()
+    return [dict(l) for l in linhas]
 
 
 def limpar_sessoes_velhas() -> None:

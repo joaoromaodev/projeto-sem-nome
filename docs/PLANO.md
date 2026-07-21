@@ -39,7 +39,9 @@ dessa reação que os avatares saíram da Etapa 3 e viraram Etapa 1.
 
 Etapa 1 concluída e testada. Etapa 2 (YouTube sincronizado) com o código
 todo pronto — falta só o teste com gente de verdade, que é o critério de
-saída dela. Lobby e lista de salas prontos. **No ar em
+saída dela. Lobby e lista de salas prontos. **Etapa 5 com a fundação de
+pé: a sala tem memória e sobrevive ao restart** (falta sala privada,
+favoritos e decoração). **No ar em
 <https://2gether.fly.dev>.** Repositório público em
 `github.com/joaoromaodev/projeto-sem-nome`.
 
@@ -77,6 +79,11 @@ saída dela. Lobby e lista de salas prontos. **No ar em
 - Barra de digitar atravessando o rodapé, conversa ocupando a coluna
   direita inteira, e a lista de nomes trocada por cabecinha + número
 - Volume individual, com mudo e memória entre visitas
+- **A sala tem memória e sobrevive ao restart:** quanto já tocou ali, o
+  que já rolou (com quem colocou), quem frequenta e quem é o dono. A sala
+  entra contando isso no chat; sala nova fica calada
+- **"Suas salas" na home** — as que você frequenta, inclusive as vazias,
+  que a lista de descoberta esconde de propósito
 
 **Não funciona ainda:** compartilhamento de tela, sala privada, histórico
 da sala.
@@ -103,8 +110,11 @@ Em ordem, quando esta sessão for retomada:
 2. **Receber as 5 camadas de arte** e validar com
    `python ferramentas/conferir_sprites.py`. O usuário estava produzindo a
    partir de uma base de 27×46 que ia expandir pra 32×48.
-3. **Etapa 5 — a sala persistente.** Com a Etapa 2 fechada em código, esta
-   passou a ser a maior fatia de trabalho restante, e é a que fecha a tese.
+3. **Etapa 5 — o que sobrou dela.** A fundação está de pé (salas,
+   histórico e membros no banco). Falta: **sala privada por convite** —
+   agora destravada, porque o `dono` já sobrevive ao restart —, favoritos
+   do grupo, o avatar apagadinho de quem está offline, e decoração (pôr a
+   posição da TV e do sofá no banco, que hoje é fixa no CSS/JS).
    A Etapa 4 (WebRTC) segue por último de propósito.
 
 ### O que foi verificado, e o que não foi
@@ -131,6 +141,34 @@ e o layout medido no DOM em vez de olhado por cima.
 **andando** e o pulo com a sombra encolhendo. O que foi conferido é que as
 5 camadas compõem certo nas três variações (parado, andando, virado); ver
 o movimento acontecer, não.
+
+**Verificado na sala persistente (o teste central: matar o servidor e
+voltar):** com o processo derrubado de verdade e subido de novo, a sala
+voltou com o contador em 1, o histórico com "Me at the zoo" e o nome de
+quem colocou, e a duda na lista de membros — tudo lido do banco, com a
+memória do processo comprovadamente vazia (`manager.rooms` em `[]` logo
+após o import, que é o efeito de o lobby ter saído do `__init__`).
+
+Também verificado: o vídeo tocando **até o fim num navegador de verdade**
+e o contador subindo por esse caminho, não por chamada direta; o título
+chegando vazio na gravação e sendo preenchido depois pelo oEmbed, no
+caminho real; um segundo título **não** sobrescrevendo o já gravado; o
+teto do histórico segurando em 200 depois de 225 inserções; a bia não
+vendo a sala da duda em "suas salas" antes de entrar, e virando membro ao
+entrar **sem** virar dona; e a linha "costumam aparecer por aqui" saindo
+com "duda" pra bia e não saindo pra duda — ou seja, ninguém é informado
+de que costuma aparecer onde está.
+
+**Bug de texto achado aí:** "1 músicas já tocaram aqui". Apareceu nos dois
+lugares que mostram o contador (o chat da sala e a linha de "suas salas"),
+porque os dois interpolavam o número direto. Corrigido nos dois.
+
+**NÃO verificado:** a sala persistente com gente de verdade voltando dias
+depois — que é a única forma de saber se "suas salas" faz alguém voltar,
+e é a mesma pergunta em aberto logo abaixo. O screenshot do navegador
+travou nesta sessão; o layout de "suas salas" foi conferido **medindo o
+DOM** (largura 338px dentro da coluna, página sem rolagem horizontal,
+console sem erro), não olhando.
 
 ### ⚠ A pergunta que ainda não foi respondida
 
@@ -188,6 +226,15 @@ Não reabrir sem motivo novo.
 | **A linha "fulano está digitando" fica fora do histórico** | Como o aviso é reenviado a cada 2s enquanto a pessoa escreve, virar mensagem de chat encheria o log de linhas repetidas. É **estado, não acontecimento**: tem lugar fixo embaixo do histórico e some quando acaba. A altura fica reservada mesmo vazia, senão o chat pula toda vez que alguém começa a digitar. |
 | **A linha e o balão saem do mesmo estado** | Os dois são derivados do `pensandoAte` de cada pessoa, em vez de a linha ter contagem própria. Duas fontes de verdade pra mesma coisa acabam discordando — o balão sumindo e a linha ficando pendurada, ou o contrário. |
 | **"Está digitando" não carrega texto** | Só um liga/desliga. Mandar o que a pessoa escreve antes de ela apertar enter vazaria rascunho — inclusive o que ela escreveu, pensou melhor e apagou. |
+| **Presença em memória, memória no banco** | A tentação era persistir a sala inteira. Mas quem está dentro *agora* é fato do instante: se o servidor cair no meio, as linhas gravadas viram gente fantasma numa sala que ninguém está — e a lista de salas passaria a mentir exatamente sobre a coisa que ela existe pra informar. Então presença (quem está, onde o boneco está, quem segurou o controle, que segundo do vídeo toca) fica em memória e morre com o processo, de propósito. Dono, contador, histórico e frequentadores vão pro banco. A régua: **se um crash tornar o dado falso, ele não devia estar gravado.** |
+| **O contador é somado pelo banco, não pela memória** | `video_acabou` manda o banco incrementar e adota o total que volta de lá. Somar em memória e gravar depois daria dois números pra mesma coisa, e o de memória mentiria depois de qualquer restart — que no Fly acontece toda vez que a máquina dorme. Uma fonte de verdade só. |
+| **O histórico anota quando o vídeo entra** | Não quando acaba. Metade das músicas é pulada antes do fim, e o histórico existe pra responder "o que já rolou nessa sala", não "o que foi ouvido inteiro". Anotar no fim perderia justamente as que alguém pulou por serem ruins — que é informação sobre a sala. |
+| **O título do histórico é preenchido depois** | A linha nasce com o título vazio porque no instante em que o vídeo entra o oEmbed quase nunca respondeu ainda. Esperar o rótulo pra gravar repetiria o erro que a decisão "o título nunca segura o vídeo" já resolveu. Quando a busca volta, ela preenche **só o que está vazio** — título já gravado é o que a sala viu na época, e reescrever apagaria isso à toa. |
+| **A faxina de salas vazias não apaga sala** | Ela descarta a **cópia em memória** de quem não tem ninguém há uma hora. A sala continua inteira no banco, com dono, contador, histórico e membros. Quem voltar amanhã encontra o lugar de volta — que é exatamente a diferença entre um lugar e um link. |
+| **"Suas salas" mostra sala vazia; "onde tem gente" não** | Parece contradição e não é: são perguntas diferentes. A lista de cima é **descoberta** — entrar num lugar deserto de estranhos e sair é a pior primeira impressão, então sala vazia não entra. A de baixo é **retorno**: a sua sala vazia é um lugar que você conhece, e você pode querer abrir justamente pra ser o primeiro. Mesma informação, decisões opostas. |
+| **O passado da sala chega pelo chat, não num painel** | Sala que abre com um relatório do lado vira ferramenta, e a tese é que ela seja um lugar. No chat, "342 músicas já tocaram aqui" e "a última foi X, que a duda colocou" chegam como alguém te contando. Sala sem história fica **calada** em vez de anunciar três zeros. |
+| **Quem chega primeiro numa sala nova vira dono** | Não dá poder nenhum hoje. É o gancho da sala privada por convite, que precisa de um dono que sobreviva ao restart — e era exatamente por isso que aquele item estava travado. Entrar depois não muda o dono. |
+| **O lobby não nasce mais no import** | `RoomManager.__init__` criava o lobby na hora de importar o módulo. Montar uma sala hoje **escreve no banco**, e o import acontece antes de `db.iniciar()` ter criado as tabelas. Agora quem chama é o lifespan, depois do banco de pé. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 
 ---
@@ -455,16 +502,29 @@ propósito: é a parte mais frágil e a que menos gerou entusiasmo.
 O que fecha a tese. Hoje a sala some quando o servidor reinicia — e no Fly
 isso acontece toda vez que a máquina dorme por falta de gente.
 
-- [ ] Salas no banco (não só em memória)
+- [x] Salas no banco (não só em memória). Tabelas `salas`,
+      `sala_historico` e `sala_membros`. A divisão que vale lembrar:
+      **presença fica em memória, memória fica no banco.** Quem está
+      dentro agora, onde o boneco está e quem segurou o controle são
+      estado de agora — guardar isso criaria gente fantasma
+      sobrevivendo a um crash. Dono, contador, histórico e frequentadores
+      são passado, e é o passado que faz a sala ser um lugar.
+- [x] Histórico: o que já tocou ali. Anotado quando o vídeo **entra**, não
+      quando acaba — metade das músicas é pulada, e a pergunta que o
+      histórico responde é "o que já rolou aqui", não "o que foi ouvido
+      inteiro". Teto de 200 linhas por sala, podado na mesma transação da
+      inserção.
+- [x] Contador visível. Aparece no chat na entrada e na linha da sala em
+      "suas salas"
+- [x] Membros: quem frequenta. O avatar já vem na resposta; o desenho
+      apagadinho de quem está offline ainda não foi feito
+- [x] "Suas salas" na home — as que você frequenta, que é exatamente o
+      comportamento recorrente que a tese quer premiar
 - [ ] **Sala privada por link de convite.** Decidido que é convite e não
       lista de permissões: entre amigos, gerenciar permissão é burocracia
-      que ninguém usa. Depende deste item de persistência pra ter dono.
-- [ ] Histórico: o que já tocou ali
-- [ ] Contador visível ("342 músicas ouvidas aqui")
+      que ninguém usa. **O bloqueio caiu:** a coluna `dono` já existe e
+      sobrevive ao restart. Falta a lógica de convite.
 - [ ] Favoritos do grupo
-- [ ] Membros: quem frequenta, com avatar apagadinho pra quem está offline
-- [ ] "Suas salas" no lobby — as que você frequenta, que é exatamente o
-      comportamento recorrente que a tese quer premiar
 - [ ] Decoração da sala. **Já existe um primeiro passo**: a TV e o sofá
       são móveis de verdade no `#chao`, com profundidade igual à dos
       bonecos. Mas a posição das duas está **fixa no CSS/JS** — não é
