@@ -21,6 +21,10 @@ const VEL_Y = 20;                // o chão é raso, então anda mais devagar em
 const ENVIO_MS = 90;             // de quanto em quanto tempo aviso minha posição
 const LIM = { x0: 3, x1: 97, y0: 4, y1: 92 };
 const BALAO_MS = 5200;
+// Quanto o balão de "digitando" sobrevive sem notícia nova. Tem que ser
+// maior que o intervalo de reaviso de quem digita (DIGITANDO_REENVIO_MS),
+// senão ele pisca entre um reaviso e o outro.
+const DIGITANDO_SOME_MS = 5000;
 
 const codigo = decodeURIComponent(location.pathname.replace("/sala/", ""));
 
@@ -85,6 +89,7 @@ function novaPessoa(dados, souEu) {
     destino: { ...dados.pos },   // pra onde está indo (remotos interpolam até aqui)
     el, cv, ctx: cv.getContext("2d"), nomeEl: nome,
     balao: null, balaoAte: 0,
+    pensando: null, pensandoAte: 0,
     virado: false, andando: false, quadro: 0, tQuadro: 0,
     sujo: true,
   };
@@ -116,6 +121,33 @@ function falar(p, texto) {
   p.balao.textContent = texto;
   p.balao.style.display = "";
   p.balaoAte = performance.now() + BALAO_MS;
+  // Falou: não está mais digitando. Os dois balões moram no mesmo lugar
+  // sobre a cabeça, e deixar os pontinhos ali por baixo da fala seria dois
+  // balões empilhados.
+  mostrarDigitando(p, false);
+}
+
+/** Os três pontinhos sobre a cabeça de quem está escrevendo. */
+function mostrarDigitando(p, ligado) {
+  if (!ligado) {
+    if (p.pensando) p.pensando.style.display = "none";
+    p.pensandoAte = 0;
+    return;
+  }
+  if (!p.pensando) {
+    p.pensando = document.createElement("div");
+    p.pensando.className = "balao digitando";
+    p.pensando.append(
+      document.createElement("i"),
+      document.createElement("i"),
+      document.createElement("i"),
+    );
+    p.el.appendChild(p.pensando);
+  }
+  p.pensando.style.display = "";
+  // Prazo de validade: se a pessoa fechar a aba no meio da frase, o aviso
+  // de "parei" nunca chega e o balão ficaria pendurado pra sempre.
+  p.pensandoAte = performance.now() + DIGITANDO_SOME_MS;
 }
 
 /* ------------------------------------------------------------ desenho */
@@ -148,6 +180,11 @@ function laco(agora) {
     if (p.balao && p.balaoAte && agora > p.balaoAte) {
       p.balao.style.display = "none";
       p.balaoAte = 0;
+    }
+
+    if (p.pensando && p.pensandoAte && agora > p.pensandoAte) {
+      p.pensando.style.display = "none";
+      p.pensandoAte = 0;
     }
   }
 
@@ -253,6 +290,12 @@ addEventListener("keyup", (e) => {
 addEventListener("blur", () => teclas.clear());
 
 chao.addEventListener("click", (e) => {
+  // Clicar na TV é mexer no vídeo, não mandar o boneco atravessar a sala
+  // até ela. O sofá é o contrário — lá o clique atravessa de
+  // propósito (`pointer-events: none`), porque ir até o móvel é
+  // exatamente o que se espera de quem clica nele.
+  if (e.target.closest("#tv")) return;
+
   const r = chao.getBoundingClientRect();
   alvo = {
     x: clamp(((e.clientX - r.left) / r.width) * 100, LIM.x0, LIM.x1),
@@ -294,10 +337,134 @@ function enviarChat() {
   if (!conectado()) return sistema("sem conexão — tenta de novo em instantes");
   enviar({ type: "chat", text: txt });
   el.value = "";
+  avisarDigitando(false);
 }
 
 $("#enviar").onclick = enviarChat;
 $("#dizer").addEventListener("keydown", (e) => { if (e.key === "Enter") enviarChat(); });
+
+/* ------------------------------------------------- "está digitando"
+
+   Mandamos só um liga/desliga, nunca o texto: o que a pessoa escreveu e
+   apagou antes de mandar é dela.
+
+   Enquanto ela digita, reavisamos de tempos em tempos em vez de mandar a
+   cada tecla — uma mensagem por caractere seria trocar rajada de rede por
+   um enfeite. Do outro lado o balão sobrevive um pouco mais que esse
+   intervalo, senão ele piscaria entre um reaviso e outro. */
+const DIGITANDO_REENVIO_MS = 2000;
+
+let digitandoDesde = 0;
+
+function avisarDigitando(ligado) {
+  if (!conectado()) return;
+  const agora = performance.now();
+  if (ligado) {
+    if (agora - digitandoDesde < DIGITANDO_REENVIO_MS) return;
+    digitandoDesde = agora;
+  } else {
+    if (!digitandoDesde) return;   // já estava parado; não precisa avisar
+    digitandoDesde = 0;
+  }
+  enviar({ type: "digitando", ligado });
+}
+
+$("#dizer").addEventListener("input", () => {
+  avisarDigitando($("#dizer").value.trim().length > 0);
+});
+// Saiu do campo: parou. Sem isto, quem clica fora com texto escrito fica
+// "digitando" pros outros até o balão expirar sozinho.
+$("#dizer").addEventListener("blur", () => avisarDigitando(false));
+
+/* ------------------------------------------------------------ buzina
+
+   TEMPORÁRIO — combinado que sai depois. Existe porque o uso real é
+   deixar a aba escondida ouvindo música: sem barulho, o chat só é lido
+   quando alguém lembra de olhar.
+
+   Faz duas coisas de propósito. O som chama quem está de fone; o título
+   piscando chama quem está com o som desligado e só vê a barra de abas.
+   Só o som não bastaria. */
+
+let audio = null;
+
+/* O navegador cria o contexto de áudio suspenso até a pessoa interagir com
+   a página. Isso morde exatamente o caso de uso: quem deixou a aba aberta
+   sem clicar em nada é justamente quem mais precisa ouvir a buzina. Então
+   destravamos no primeiro gesto, qualquer um, e não na hora do barulho —
+   na hora do barulho já é tarde. */
+function destravarAudio() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === "suspended") audio.resume().catch(() => {});
+  } catch {
+    // navegador sem WebAudio: resta o título piscando
+  }
+}
+for (const gesto of ["pointerdown", "keydown"]) {
+  addEventListener(gesto, destravarAudio, { once: true });
+}
+
+function tocarBuzina() {
+  try {
+    destravarAudio();
+    if (!audio) return;
+
+    const t0 = audio.currentTime;
+    // duas notas descendo, tipo buzina de portaria
+    for (const [atraso, hz] of [[0, 466], [0.16, 370]]) {
+      const osc = audio.createOscillator();
+      const vol = audio.createGain();
+      osc.type = "sawtooth";
+      osc.frequency.value = hz;
+      // envelope: sobe rápido e cai, senão estala no começo e no fim
+      vol.gain.setValueAtTime(0, t0 + atraso);
+      vol.gain.linearRampToValueAtTime(0.22, t0 + atraso + 0.02);
+      vol.gain.setValueAtTime(0.22, t0 + atraso + 0.13);
+      vol.gain.linearRampToValueAtTime(0, t0 + atraso + 0.3);
+      osc.connect(vol).connect(audio.destination);
+      osc.start(t0 + atraso);
+      osc.stop(t0 + atraso + 0.32);
+    }
+  } catch {
+    // sem áudio disponível: o título piscando ainda avisa
+  }
+}
+
+let piscando = null;
+
+function chamarAtencao() {
+  if (piscando) return;
+  const original = document.title;
+  let liga = false;
+  const parar = () => {
+    clearInterval(piscando);
+    piscando = null;
+    document.title = original;
+    removeEventListener("focus", parar);
+    document.removeEventListener("visibilitychange", aoVer);
+  };
+  const aoVer = () => { if (document.visibilityState === "visible") parar(); };
+
+  piscando = setInterval(() => {
+    document.title = (liga = !liga) ? "🔔 CHAMARAM NA SALA!" : original;
+  }, 700);
+
+  addEventListener("focus", parar);
+  document.addEventListener("visibilitychange", aoVer);
+  // Rede de segurança: se ninguém olhar, não fica piscando pra sempre.
+  setTimeout(() => { if (piscando) parar(); }, 25000);
+}
+
+$("#buzina").onclick = () => {
+  if (!conectado()) return sistema("sem conexão — tenta de novo em instantes");
+  enviar({ type: "buzina" });
+  // Trava o botão pelo mesmo tempo que o servidor trava, pra quem apertou
+  // ver que não adianta martelar.
+  const b = $("#buzina");
+  b.disabled = true;
+  setTimeout(() => { b.disabled = false; }, 6000);
+};
 
 /* `saindo` avisa o laço de reconexão que a queda do socket foi de propósito
    — sem isso ele tentaria reconectar durante a navegação. */
@@ -466,10 +633,22 @@ $("#btVoltar").onclick  = () => enviar({ type: "video_seek", pos: video.posicaoR
 $("#btAvancar").onclick = () => enviar({ type: "video_seek", pos: video.posicaoRelativa(10) });
 $("#btPular").onclick   = () => enviar({ type: "video_pular" });
 
+/* A fila fica escondida atrás de um botão. Aberta o tempo todo ela comia
+   altura da barra mesmo vazia, que é o estado mais comum da sala. */
+$("#verFila").onclick = (e) => {
+  e.stopPropagation();
+  $("#filaPop").hidden = !$("#filaPop").hidden;
+};
+// clicar fora fecha
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".filaCaixa")) $("#filaPop").hidden = true;
+});
+
 function pintarFila() {
   const alvo = $("#fila");
   alvo.textContent = "";
   $("#filaVazia").hidden = filaAtual.length > 0;
+  $("#verFila").textContent = `fila (${filaAtual.length})`;
 
   filaAtual.forEach((id, i) => {
     const el = document.createElement("div");
@@ -545,22 +724,26 @@ painel.addEventListener("click", (e) => e.stopPropagation());
 
 /* ------------------------------------------------------------ roster */
 
+/* Era uma janela listando nome por nome. Virou uma cabecinha e um número:
+   quem está na sala já aparece no chão, com boneco e apelido embaixo — a
+   lista repetia essa informação ocupando uma janela inteira da coluna.
+
+   A cabeça é o avatar de quem está olhando, recortado por CSS (a caixa
+   tem 20×16 e o canvas entra deslocado). Serve de ícone e de brinde: você
+   se reconhece ali. */
 function pintarLista() {
-  const lista = $("#lista");
-  lista.innerHTML = "";
-  for (const p of gente.values()) {
-    const div = document.createElement("div");
+  const caixa = $("#quantos .cabeca");
+  const eu = gente.get(meuUid);
+  if (eu) {
+    caixa.textContent = "";
     const cv = document.createElement("canvas");
     cv.width = LARG; cv.height = ALT_CANVAS;
-    desenhar(cv.getContext("2d"), p.avatar, { esc: 1, sombra: false });
-    const nome = document.createElement("span");
-    nome.textContent = p.nick + (p.uid === meuUid ? " (você)" : "");
-    if (p.uid === meuUid) nome.style.fontWeight = "bold";
-    div.append(cv, nome);
-    lista.appendChild(div);
+    desenhar(cv.getContext("2d"), eu.avatar, { esc: 1, sombra: false });
+    caixa.appendChild(cv);
   }
-  $("#contagem").textContent =
-    gente.size === 1 ? "só você por aqui" : gente.size + " na sala";
+  $("#contagem").textContent = gente.size;
+  $("#quantos").title =
+    gente.size === 1 ? "só você por aqui" : `${gente.size} na sala`;
 }
 
 /* ------------------------------------------------------------ conexão */
@@ -719,6 +902,18 @@ function receber(m) {
         sistema(`acabou — ${musicasOuvidas} já tocaram nesta sala`);
       }
       mostrarVideo(m);
+      break;
+
+    case "digitando": {
+      const p = gente.get(m.uid);
+      if (p) mostrarDigitando(p, m.ligado);
+      break;
+    }
+
+    case "buzina":
+      tocarBuzina();
+      chamarAtencao();
+      linha(`<b>📣 ${esc(m.nick)} buzinou!</b>`, "sis");
       break;
 
     case "sistema":

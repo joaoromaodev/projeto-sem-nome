@@ -37,6 +37,11 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
 
 - **Vídeo do YouTube sincronizado** — cola o link e toca junto pra todo
   mundo; quem chega no meio entra no ponto certo
+- **O vídeo toca dentro da TV da sala** — a televisão é um móvel no chão,
+  com os bonecos andando na frente dela; quando não tem nada tocando, ela
+  mostra a tela verde de TV desligada
+- **Balão de "está digitando"** — três pontinhos sobre a cabeça de quem
+  está escrevendo
 - **Controle remoto** — fica no chão da sala; quem pega manda no play,
   pause, avançar e pular, e devolve quando quiser
 - **Fila de vídeos** — qualquer um põe, e o próximo entra sozinho

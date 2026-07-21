@@ -208,6 +208,33 @@ label { user-select: none; }
 .balao::before { bottom: -6px; border-top-color: #000; }
 .balao::after  { bottom: -5px; border-top-color: #fff; }
 
+/* ------------------------------------------- "está digitando"
+   Reaproveita o balão de fala inteiro — mesma caixa, mesma setinha, mesmo
+   lugar sobre a cabeça — porque é a mesma ideia: aquela pessoa está
+   falando com você. A diferença é só o conteúdo, três pontinhos que
+   pulsam em vez de texto.
+
+   Some sozinho: quem fecha a aba no meio de uma frase não manda o aviso
+   de que parou, e o balão ficaria pendurado pra sempre. O cliente também
+   derruba por tempo — ver `DIGITANDO_SOME_MS` em sala.js. */
+
+.balao.digitando {
+  padding: 5px 7px;
+  display: flex; gap: 3px; align-items: center;
+}
+.balao.digitando i {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: #555; display: block;
+  animation: pontinho 1.2s ease-in-out infinite;
+}
+.balao.digitando i:nth-child(2) { animation-delay: .18s; }
+.balao.digitando i:nth-child(3) { animation-delay: .36s; }
+
+@keyframes pontinho {
+  0%, 60%, 100% { opacity: .28; transform: translateY(0); }
+  30%           { opacity: 1;   transform: translateY(-3px); }
+}
+
 /* ---------------------------------------------------- chat */
 
 #chatlog {

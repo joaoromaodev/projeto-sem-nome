@@ -152,6 +152,29 @@ class PingIn(BaseModel):
     type: Literal["ping"]
 
 
+class DigitandoIn(BaseModel):
+    """"Fulano está digitando".
+
+    Não carrega texto nenhum de propósito: mandar o que a pessoa está
+    escrevendo antes de ela apertar enter seria vazar rascunho — inclusive
+    o que ela apagou e decidiu não dizer.
+    """
+
+    type: Literal["digitando"]
+    ligado: bool
+
+
+class BuzinaIn(BaseModel):
+    """Chama a atenção de quem está com a aba escondida.
+
+    Existe porque o uso real é ficar de música no fundo, aba oculta: sem um
+    barulho, o chat só é lido quando alguém lembra de olhar. É temporário —
+    ver a nota em `main.py` sobre por que ele nasce com trava de tempo.
+    """
+
+    type: Literal["buzina"]
+
+
 # ------------------------------------------------------------------ vídeo
 # O servidor é a fonte da verdade da reprodução. O cliente nunca trata o
 # próprio player como verdade: ele manda a intenção ("dei play em tal
@@ -226,6 +249,7 @@ class VideoFimIn(BaseModel):
 
 
 IncomingT = (ChatIn | MoveIn | AvatarIn | NickIn | PingIn
+             | DigitandoIn | BuzinaIn
              | VideoPorIn | VideoPlayIn | VideoPauseIn | VideoSeekIn
              | VideoFimIn | VideoPularIn
              | FilaPorIn | FilaTirarIn

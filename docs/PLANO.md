@@ -63,11 +63,26 @@ saída dela. Lobby e lista de salas prontos. **No ar em
 - YouTube sincronizado pelo servidor, com correção de deriva; controle
   remoto como objeto da sala; fila de vídeos; título de cada vídeo pelo
   oEmbed, sem chave de API
+- Móveis na sala: uma TV de tubo (com o vídeo rodando dentro da tela dela,
+  e tela verde quando não tem nada) e um sofá de 3 lugares, com a mesma
+  regra de profundidade dos bonecos
+- Balão de "está digitando" com três pontinhos sobre a cabeça
+- Buzina que toca um som e pisca o título pra chamar quem está com a aba
+  escondida — **temporária**, ver a nota nas pendências
+- Barra de digitar atravessando o rodapé, conversa ocupando a coluna
+  direita inteira, e a lista de nomes trocada por cabecinha + número
 
 **Não funciona ainda:** compartilhamento de tela, sala privada, histórico
 da sala.
 
-**A arte atual é provisória.** `ferramentas/gerar_placeholders.py` gera
+**A arte dos móveis já é definitiva** — é do próprio autor do projeto, não
+placeholder. Fica em `static/moveis/` na resolução nativa (sofá 128×40, TV
+80×80, tela verde 46×30); chegou ampliada 3× e foi reduzida com
+vizinho-mais-próximo, ida e volta conferida como idêntica. **A tela da TV
+é transparente no PNG**, e é isso que deixa o vídeo aparecer por trás sem
+máscara nenhuma.
+
+**A arte dos bonecos ainda é provisória.** `ferramentas/gerar_placeholders.py` gera
 camadas de andaime pra o sistema ficar testável. Quando os sprites de
 verdade chegarem, é sobrescrever os arquivos em `static/sprites/` e apagar
 esse script — nenhum código muda.
@@ -143,6 +158,14 @@ Não reabrir sem motivo novo.
 | **Sala privada depende de persistência** | Sala privada precisa de dono, e dono precisa sobreviver ao restart. Hoje `Room` vive num dict em memória: reiniciou, evaporou o dono junto. Por isso o item foi empurrado pra depois da Etapa 5, e não improvisado agora. |
 | **Título por oEmbed, não pela YouTube Data API** | O plano pedia a API de dados, que exigiria projeto no Google Cloud, chave, secret no Fly e cota diária — quatro peças pra manter por causa de um texto. O oEmbed do próprio YouTube (`youtube.com/oembed`) devolve o título por URL pública, sem nada disso. O preço é não responder por vídeo privado, apagado ou sem embed; nesses casos o título sai vazio e a tela mostra o id, que é exatamente o que ela mostrava antes. Degrada pro comportamento antigo em vez de quebrar. |
 | **O título nunca segura o vídeo** | A busca é `create_task` e o título chega numa mensagem própria, depois. Esperar um GET pro YouTube antes de dar play atrasaria a sala inteira por causa de um rótulo — trocaria sincronia, que é a coisa difícil do projeto, por enfeite. Pelo mesmo motivo o `bemvindo` só manda o que já está em cache. |
+| **A TV é objeto da sala, não widget na coluna** | O vídeo saiu da coluna lateral e foi pra dentro de uma TV que existe no chão — mesma lógica do controle remoto: coisa que está no lugar, não painel numa caixa. |
+| **Móvel desenha em 1×, boneco em 2×** | Parece descuido e não é. A arte dos móveis foi feita com o dobro da densidade de pixel do boneco: o corpo dele ocupa 20×36 do sprite, e a TV ocupa 80×72. Na mesma escala a TV sai com **o dobro da altura de uma pessoa** — foi exatamente assim que ela ficou gigante na primeira tentativa (5×, 400px, ~4× uma pessoa). Em 1× ela lê como TV de tubo, o sofá tem metade da altura de quem está em pé, e tudo continua em pixel inteiro, que é o que mantém a arte nítida. Escala fracionária resolveria a proporção e borraria o pixel — não vale a troca. O botão pra mexer nisso é `--movel`, um número só. |
+| **O sofá foi alargado, não escalado** | Pedido: caber 3 pessoas. Não dá pra resolver com escala — na altura certa (1×) a arte original comportava 1,9 boneco, e ampliar pra caber 3 deixaria o encosto mais alto que uma pessoa. Então a **arte** mudou: 80→128px, repetindo uma faixa do meio (16px, não uma coluna só, pra não esticar o tracejado do encosto) e preservando os braços nas pontas. |
+| **A tela minúscula é aceita por ora** | Com a TV em 1× o vídeo tem 46×30. Foi verificado que o YouTube **toca** nesse tamanho (um vídeo de 19s rodou até o fim e o contador de músicas subiu), mas ninguém assiste um filme aí. Aceito porque o uso real declarado é som de fundo com a aba escondida. Quando quiserem assistir de verdade, a saída não é inflar esta TV — é uma segunda tela, ou clicar nela pra expandir. |
+| **O buraco da tela é transparente no PNG** | A arte da TV vem com a tela em alpha 0, então o iframe fica **atrás** da moldura e aparece pelo buraco — sem máscara, sem `clip-path`, sem recorte. As coordenadas do buraco (x=17, y=28, 46×30 no sprite de 80×80) viram `calc()` no CSS em cima da escala, então mudar a escala move moldura, buraco e vídeo juntos, sem chance de um sair do lugar do outro. |
+| **A buzina nasce com trava, mesmo sendo temporária** | Ela toca som na máquina dos outros — a coisa mais fácil do projeto de virar brincadeira, e quem paga é quem está de fone. A trava (6s) é **por sala e não por pessoa**: o incômodo é o barulho, e pra quem ouve tanto faz se as dez buzinas vieram de um ou de dez. Limitar por pessoa deixaria a sala inteira buzinar em fila com o mesmo efeito. |
+| **A buzina pisca o título além de tocar** | Só o som não resolve: metade do caso de uso é quem está com o volume baixo ou o fone tirado, e só enxerga a barra de abas. O som chama quem escuta; o título piscando chama quem só olha. Ele volta ao normal assim que a pessoa foca a aba, e desiste sozinho depois de 25s. |
+| **"Está digitando" não carrega texto** | Só um liga/desliga. Mandar o que a pessoa escreve antes de ela apertar enter vazaria rascunho — inclusive o que ela escreveu, pensou melhor e apagou. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 
 ---
@@ -240,6 +263,33 @@ fora da coluna de 260px. É a pendência "não cabe na tela" aparecendo de
 novo, e pelo mesmo motivo: **componente dimensionado pelo conteúdo dentro
 de coluna de largura fixa.** Corrigido com reticências, e o título inteiro
 continua no `title` do elemento.
+
+**Verificado nos móveis (no navegador, medindo o DOM):** o iframe caindo
+exatamente no buraco da tela; a tela verde aparecendo com a TV desligada e
+sumindo quando entra vídeo; o boneco nascendo entre a TV e o sofá, na
+frente de uma e atrás do outro; e — a dúvida que valia a pena tirar — o
+YouTube **tocando de verdade num player de 46×30**: um vídeo de 19s rodou
+até o fim sozinho e o contador de músicas da sala subiu.
+
+**Verificado no digitando e na buzina (dois clientes):** o balão de
+pontinhos aparecendo sobre o boneco certo, com os três pontos animando
+escalonados, e sumindo quando a pessoa sai; quem digita **não** recebe o
+próprio aviso; a buzina chegando nos dois lados (inclusive em quem
+apertou, que é o retorno de que funcionou); a segunda buzina seguida sendo
+barrada com aviso e **não** chegando nos outros; a trava soltando depois
+do intervalo; o título piscando e voltando ao normal quando a aba é
+focada; e `ligado: "talvez"` sendo ignorado sem derrubar a conexão.
+
+**Bug de uso achado aí:** o spawn do servidor sorteava `y` entre 20 e 60%,
+e a TV ocupa a partir de ~36% — quem caísse atrás dela entrava na sala
+**invisível**, coberto pela televisão, sem entender que já estava dentro.
+Trocado pra 10..32%. Andar pra trás do móvel e sumir tudo bem, porque foi
+escolha de quem andou; nascer escondido, não.
+
+**Cuidado ao mexer:** `YT.Player` **substitui** o elemento alvo pelo
+iframe em vez de inserir dentro dele. Ou seja, `#player` deixa de ser um
+`div` e passa a ser o próprio `<iframe>` — procurar por `#player iframe`
+não acha nada e parece que o player não montou. Já custou um susto.
 
 **NÃO verificado:** duas pessoas de verdade, em máquinas diferentes,
 assistindo juntas. Todo o teste de sincronia foi feito com um navegador e
@@ -364,7 +414,12 @@ isso acontece toda vez que a máquina dorme por falta de gente.
 - [ ] Membros: quem frequenta, com avatar apagadinho pra quem está offline
 - [ ] "Suas salas" no lobby — as que você frequenta, que é exatamente o
       comportamento recorrente que a tese quer premiar
-- [ ] Decoração da sala
+- [ ] Decoração da sala. **Já existe um primeiro passo**: a TV e a poltrona
+      são móveis de verdade no `#chao`, com profundidade igual à dos
+      bonecos. Mas a posição das duas está **fixa no CSS/JS** — não é
+      estado de sala, não vem do servidor e ninguém pode mover. Virar
+      decoração de verdade é justamente pôr isso no banco junto com a
+      sala, que é o item de persistência aqui em cima.
 
 Esse conjunto é o que faz alguém abrir o site sem motivo específico — que é
 exatamente o comportamento que o projeto quer.
@@ -408,6 +463,18 @@ exatamente o comportamento que o projeto quer.
       empilhado; paleta em popover em vez de grade sempre aberta; ou o
       painel da sala com `max-height` e rolagem, que é o remendo mínimo se
       a arte demorar.
+- [ ] **Tirar a buzina — combinado desde o dia em que entrou.** Ela nasceu
+      pra um uso específico: o autor no escritório, com colegas e chefe na
+      mesma sala, todos de música com a aba escondida — em vez de mandar
+      WhatsApp por algo urgente, aperta o botão e todo mundo olha a aba.
+      Fora desse contexto é só um botão que faz barulho na máquina alheia.
+      Já nasceu com trava de 6s por sala (ver decisões travadas), mas trava
+      não resolve o problema de fundo, que é não ter dono: **qualquer um
+      buzina pra qualquer um**. Se for pra ficar, precisa virar outra
+      coisa — menção com @, ou aviso só pra quem escolheu receber. Pra
+      remover: `BuzinaIn` no `protocol.py`, o ramo no `main.py`,
+      `Room.buzinar`, e o botão + `tocarBuzina`/`chamarAtencao` no
+      `sala.js`.
 - [ ] **Screenshots no README.** Faltam; o README de portfólio ganharia muito.
 - [ ] **Reintroduzir o editor de pixel como retoque.** Decidido: ele não é
       pra desenhar do zero (a 32×48 são 1.536 pixels, ninguém faria), e sim

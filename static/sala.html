@@ -7,12 +7,16 @@
 <link rel="stylesheet" href="/css/y2k.css">
 <style>
   body { padding: 8px; display: flex; }
-  .tela { display: flex; gap: 8px; width: 100%; height: 100%; }
+  /* A tela virou coluna: sala + chat em cima, barra de digitar atravessando
+     a largura toda embaixo. */
+  .tela { display: flex; flex-direction: column; gap: 8px; width: 100%; height: 100%; }
+  .topo { display: flex; gap: 8px; flex: 1; min-height: 0; }
   .esquerda { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-  .direita { width: 260px; flex: none; display: flex; flex-direction: column; gap: 8px; }
-  /* O chat é quem estica pra ocupar a sobra. Era ":first-child", mas o
-     telão passou pra frente dele na coluna — regra por posição quebra
-     quando a ordem muda, então agora é por nome. */
+  /* A coluna da direita é só o histórico de conversa, de cima a baixo. O
+     telão saiu daqui (virou a TV do cenário) e a lista de "quem tá aqui"
+     virou um contador na barra da sala — nome por nome era informação que
+     o próprio chão já dá, já que os bonecos estão todos à vista. */
+  .direita { width: 260px; flex: none; display: flex; flex-direction: column; }
   .direita .chat { flex: 1; min-height: 0; }
   .corpo.semfolga { padding: 0; display: flex; flex-direction: column; }
   #dizer { flex: 1; min-width: 0; }
@@ -24,9 +28,6 @@
   #status { margin-left: auto; font-weight: bold; }
   #status.on { color: #060; }
   #status.off { color: #a00; }
-  #lista { padding: 6px 8px; font-size: 12px; overflow-y: auto; }
-  #lista div { display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
-  #lista canvas { image-rendering: pixelated; flex: none; }
   .dica {
     position: absolute; left: 10px; top: 8px;
     background: rgba(0,0,0,.55); color: #fff;
@@ -36,11 +37,64 @@
   #painel { position: absolute; right: 12px; top: 12px; width: 200px; z-index: 2000; }
   #painel .corpo { padding: 8px 10px 10px; }
 
-  /* ---- vídeo ---- */
-  .telao { flex: none; margin-bottom: 8px; }
-  .telao .corpo { padding: 0; }
+  /* ---- móveis da sala ----
+     Móvel desenha em 1×, boneco em 2×. Não é descuido: a arte dos móveis
+     foi desenhada com o dobro da densidade de pixel do boneco (o corpo
+     dele ocupa 20×36 do sprite; a TV ocupa 80×72). Na mesma escala a TV
+     sairia com o dobro da altura de uma pessoa — foi assim que ela ficou
+     gigante da primeira vez. Em 1× a TV lê como TV de tubo, o sofá tem
+     metade da altura de quem está em pé, e tudo continua em pixel
+     inteiro, que é o que mantém a arte nítida.
+
+     `--movel` existe pra dar um número só a quem for mexer nisso: ele
+     escala TV, buraco da tela e vídeo juntos, sem um sair do lugar do
+     outro. */
+  #chao { --movel: 1; }
+
+  #tv, #sofa {
+    position: absolute;
+    transform: translateX(-50%);
+    image-rendering: pixelated;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+  }
+  #tv {
+    width: calc(80px * var(--movel)); height: calc(80px * var(--movel));
+    background-image: url("/moveis/tv.png");
+  }
+  /* 128×40: a arte original comportava 2 pessoas, e foi alargada
+     repetindo a faixa do meio até caber 3 bonecos lado a lado. */
+  #sofa {
+    width: calc(128px * var(--movel)); height: calc(40px * var(--movel));
+    background-image: url("/moveis/sofa.png");
+    /* Clique atravessa: mandar o boneco andar até o sofá é a reação
+       esperada de quem clica nele. Sentar fica pra quando existir. */
+    pointer-events: none;
+  }
+
+  /* Posição e profundidade dos móveis. O z-index segue a mesma regra dos
+     bonecos (1000 − y×10): quem está mais pra baixo na tela está mais à
+     frente e cobre quem está atrás. Por isso a TV encostada no fundo fica
+     atrás de todo mundo, e o sofá lá embaixo fica na frente — um
+     boneco atrás dela some da cintura pra baixo, que é o que se espera.
+
+     Os dois agora têm posição fixa: com o móvel em 1× a TV tem 80px e
+     cabe em qualquer janela, então a lógica que escolhia escala pela
+     altura da sala deixou de ter motivo e saiu. */
+  #tv   { left: 50%; bottom: 52%; z-index: 480; }
+  #sofa { left: 50%; bottom: 14%; z-index: 860; }
+
+  /* ---- vídeo, dentro do buraco da TV ----
+     O buraco é transparente no PNG, então o vídeo fica ATRÁS da moldura e
+     aparece por ele — sem máscara, sem recorte. Estes quatro números são
+     as coordenadas do buraco no sprite de 80×80, não valores escolhidos:
+     x=17 y=28, 46 de largura por 30 de altura. */
   #moldura {
-    position: relative; width: 100%; aspect-ratio: 16 / 9;
+    position: absolute;
+    left:   calc(17px * var(--movel));
+    top:    calc(28px * var(--movel));
+    width:  calc(46px * var(--movel));
+    height: calc(30px * var(--movel));
     background: #000; overflow: hidden;
   }
   #moldura iframe { display: block; width: 100%; height: 100%; border: 0; }
@@ -55,13 +109,20 @@
   }
   #liberar b { font-size: 15px; }
   #liberar span { font-size: 11px; color: #c8c0d8; }
+  /* TV desligada: a tela verde. O PNG já vem recortado no tamanho exato
+     do buraco, então é só esticar — sem deslocamento pra acertar. */
   #semvideo {
     position: absolute; inset: 0; display: flex;
-    align-items: center; justify-content: center;
-    color: #6a6280; font-size: 12px; text-align: center; padding: 12px;
+    align-items: flex-end; justify-content: center;
+    text-align: center; padding: 8px;
+    background: url("/moveis/tv-verde.png") no-repeat center / 100% 100%;
+    image-rendering: pixelated;
   }
-  .linhavideo { display: flex; gap: 5px; padding: 5px; }
-  #link { flex: 1; min-width: 0; }
+  #semvideo span {
+    font-size: 11px; color: #14361f;
+    background: rgba(255,255,255,.5); padding: 2px 6px;
+  }
+  #link { width: 190px; flex: none; min-width: 0; }
   /* Uma linha só. Desde que aqui aparece o título e não mais a palavra
      "tocando", o texto passou a ter tamanho imprevisível — sem isto um
      nome comprido vira 3 ou 4 linhas e empurra a fila pra fora da coluna.
@@ -79,19 +140,46 @@
     background: transparent; cursor: not-allowed;
   }
 
-  .botoes { display: flex; gap: 4px; padding: 5px 5px 0; }
-  .botoes button { flex: 1; padding: 4px 0; font-size: 12px; }
+  .botoes { display: flex; gap: 4px; }
+  .botoes button { padding: 4px 8px; font-size: 12px; }
   .botoes button:disabled { color: #808080; cursor: default; }
 
-  #barraControle {
-    display: flex; align-items: center; gap: 6px;
-    padding: 5px 6px; font-size: 11px;
-    border-top: 1px solid var(--sombra);
-  }
-  #quemManda { flex: 1; }
   #pegarControle { padding: 3px 8px; font-size: 11px; white-space: nowrap; }
 
-  #fila { max-height: 92px; overflow-y: auto; font-size: 11px; padding: 0 6px; }
+  /* ---- barra de baixo ----
+     Duas fileiras: em cima a conversa, que é o que mais se usa; embaixo o
+     vídeo. Numa fileira só, o campo de digitar disputaria espaço com sete
+     botões e ficaria estreito justamente no que mais importa. */
+  .rodape { flex: none; }
+  .rodape .corpo { padding: 6px; display: flex; flex-direction: column; gap: 6px; }
+  .fileira { display: flex; gap: 6px; align-items: center; }
+  .fileira.conversa #dizer { flex: 1; min-width: 0; }
+  .fileira.video { font-size: 11px; }
+  .divisoria { width: 1px; align-self: stretch; background: var(--sombra); }
+
+  /* A buzina. Vermelha porque faz barulho na máquina dos outros: um botão
+     que incomoda gente deve parecer um botão que incomoda gente. */
+  #buzina {
+    padding: 4px 12px; font-weight: bold; white-space: nowrap;
+    background: #b02020; color: #fff;
+  }
+  #buzina:disabled { background: #8a6a6a; color: #ddd; cursor: default; }
+
+  #estadovideo {
+    flex: 1; min-width: 0;
+    font-size: 10px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* A fila virou popover: aberta o tempo todo ela comia altura da barra
+     mesmo vazia, que é o estado mais comum. */
+  .filaCaixa { position: relative; }
+  #filaPop {
+    position: absolute; bottom: 100%; right: 0; margin-bottom: 4px;
+    width: 260px; max-height: 180px; overflow-y: auto;
+    background: var(--janela); border: 2px outset var(--claro);
+    padding: 4px 6px; z-index: 3000; font-size: 11px;
+  }
   #fila div {
     display: flex; align-items: center; gap: 5px;
     padding: 2px 0; border-bottom: 1px solid #e0e0e8;
@@ -99,12 +187,26 @@
   #fila .qual { flex: 1; min-width: 0; overflow: hidden;
                 text-overflow: ellipsis; white-space: nowrap; }
   #fila .tirar { cursor: pointer; color: #a00; font-weight: bold; }
-  #filaVazia { font-size: 11px; padding: 3px 6px 6px; }
+  #filaVazia { padding: 3px 2px; }
+
+  /* ---- contador de gente ----
+     Substitui a lista de nomes: quem está na sala já aparece no chão, com
+     boneco e apelido. A lista repetia isso ocupando uma janela inteira. */
+  #quantos { display: flex; align-items: center; gap: 5px; }
+  #quantos .cabeca {
+    width: 20px; height: 16px; overflow: hidden; flex: none;
+  }
+  #quantos .cabeca canvas {
+    image-rendering: pixelated; display: block;
+    /* recorta só a cabeça do sprite: 6px da esquerda, 4px do topo */
+    margin: -4px 0 0 -6px;
+  }
 </style>
 </head>
 <body>
 
 <div class="tela">
+ <div class="topo">
   <!-- ---------------- sala ---------------- -->
   <div class="esquerda">
     <div class="win" style="flex:1; min-height:0;">
@@ -122,6 +224,21 @@
         <div id="chao">
           <div class="dica">setas ou WASD pra andar &nbsp;·&nbsp; clique no chão pra ir até lá</div>
 
+          <!-- Os móveis da sala. A TV é o telão: o vídeo mora dentro do
+               buraco dela, que é transparente no PNG. -->
+          <div id="tv">
+            <div id="moldura">
+              <div id="player"></div>
+              <div id="semvideo"><span>cole um link do YouTube</span></div>
+              <div id="escudo" title="quem está com o controle remoto manda no vídeo"></div>
+              <div id="liberar" hidden>
+                <b>▶ clique pra entrar</b>
+                <span>o navegador não deixa o som começar sozinho</span>
+              </div>
+            </div>
+          </div>
+          <div id="sofa"></div>
+
           <!-- painel de editar o boneco, flutuando sobre a sala -->
           <div class="win" id="painel" hidden>
             <div class="tbar">
@@ -137,69 +254,64 @@
           </div>
         </div>
         <div class="barra">
-          <span id="contagem" class="dim">—</span>
+          <span id="quantos" class="dim" title="quanta gente está na sala">
+            <span class="cabeca"></span><b id="contagem">—</b>
+          </span>
           <span id="status" class="off">conectando...</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ---------------- chat ---------------- -->
+  <!-- ---------------- conversa ---------------- -->
   <div class="direita">
-
-    <div class="win telao">
-      <div class="tbar"><span class="t">■ telão</span></div>
-      <div class="corpo">
-        <div id="moldura">
-          <div id="player"></div>
-          <div id="semvideo">cole um link do YouTube aqui embaixo</div>
-          <div id="escudo" title="quem está com o controle remoto manda no vídeo"></div>
-          <div id="liberar" hidden>
-            <b>▶ clique pra entrar</b>
-            <span>o navegador não deixa o som começar sozinho</span>
-          </div>
-        </div>
-
-        <div class="botoes">
-          <button id="btVoltar"  title="voltar 10s"  disabled>« 10s</button>
-          <button id="btPlay"    title="tocar/pausar" disabled>▶ ‖</button>
-          <button id="btAvancar" title="avançar 10s" disabled>10s »</button>
-          <button id="btPular"   title="próximo da fila" disabled>▶▶</button>
-        </div>
-
-        <div id="barraControle">
-          <span id="quemManda" class="dim">controle remoto no chão</span>
-          <button id="pegarControle">pegar</button>
-        </div>
-
-        <div class="linhavideo">
-          <input type="text" id="link" placeholder="link do YouTube" autocomplete="off">
-          <button id="poriVideo" style="padding:4px 10px;">pôr na fila</button>
-        </div>
-        <div id="estadovideo" class="dim"></div>
-        <div id="fila"></div>
-        <div id="filaVazia" class="dim">a fila está vazia</div>
-      </div>
-    </div>
-
     <div class="win chat">
       <div class="tbar"><span class="t">■ conversa</span></div>
       <div class="corpo semfolga">
         <div id="chatlog"></div>
-        <div class="linha" style="padding:5px; flex:none;">
-          <input type="text" id="dizer" maxlength="300" placeholder="digite e dê enter" autocomplete="off">
-          <button id="enviar" style="padding:4px 10px;">▶</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="win" style="flex:none; max-height:190px;">
-      <div class="tbar"><span class="t">■ quem tá aqui</span></div>
-      <div class="corpo semfolga">
-        <div id="lista"></div>
       </div>
     </div>
   </div>
+ </div>
+
+ <!-- ---------------- barra de baixo ---------------- -->
+ <div class="win rodape">
+   <div class="corpo">
+     <div class="fileira conversa">
+       <input type="text" id="dizer" maxlength="300"
+              placeholder="digite e dê enter" autocomplete="off">
+       <button id="enviar" style="padding:4px 10px;">▶</button>
+       <!-- TEMPORÁRIO: ver a nota sobre a buzina no PLANO.md -->
+       <button id="buzina" title="toca um som pra todo mundo da sala (use só pra coisa urgente)">
+         📣 buzina
+       </button>
+     </div>
+
+     <div class="fileira video">
+       <input type="text" id="link" placeholder="link do YouTube" autocomplete="off">
+       <button id="poriVideo" style="padding:4px 10px;">pôr na fila</button>
+       <span class="divisoria"></span>
+       <span class="botoes">
+         <button id="btVoltar"  title="voltar 10s"  disabled>« 10s</button>
+         <button id="btPlay"    title="tocar/pausar" disabled>▶ ‖</button>
+         <button id="btAvancar" title="avançar 10s" disabled>10s »</button>
+         <button id="btPular"   title="próximo da fila" disabled>▶▶</button>
+       </span>
+       <span class="divisoria"></span>
+       <span id="quemManda" class="dim">controle remoto no chão</span>
+       <button id="pegarControle">pegar</button>
+       <span class="divisoria"></span>
+       <span id="estadovideo" class="dim"></span>
+       <span class="filaCaixa">
+         <button id="verFila">fila (0)</button>
+         <div id="filaPop" hidden>
+           <div id="fila"></div>
+           <div id="filaVazia" class="dim">a fila está vazia</div>
+         </div>
+       </span>
+     </div>
+   </div>
+ </div>
 </div>
 
 <script type="module" src="/js/sala.js"></script>

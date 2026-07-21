@@ -15,9 +15,9 @@ from pydantic import BaseModel, field_validator
 from starlette.websockets import WebSocketDisconnect
 
 from . import db, titulos
-from .protocol import (Avatar, AvatarIn, ChatIn, ControlePegarIn,
-                       ControleSoltarIn, FilaPorIn, FilaTirarIn, MoveIn,
-                       NickIn, PingIn, Pos, VideoFimIn, VideoPauseIn,
+from .protocol import (Avatar, AvatarIn, BuzinaIn, ChatIn, ControlePegarIn,
+                       ControleSoltarIn, DigitandoIn, FilaPorIn, FilaTirarIn,
+                       MoveIn, NickIn, PingIn, Pos, VideoFimIn, VideoPauseIn,
                        VideoPlayIn, VideoPorIn, VideoPularIn, VideoSeekIn,
                        ev, limpar_nick, parse)
 from .rooms import LOBBY, User, Video, manager
@@ -405,7 +405,12 @@ async def ws_sala(ws: WebSocket, code: str):
             uid=uid,
             nick=conta["nick"],
             avatar=Avatar(**json.loads(conta["avatar"])),
-            pos=Pos(x=20 + (hash(uid) % 60), y=20 + (hash(uid[::-1]) % 40)),
+            # Nasce na frente da sala, entre a TV e o sofá. Era 20..60,
+            # que passou a cair atrás da televisão — e quem entrasse ali
+            # apareceria coberto por ela, sem entender que já estava dentro
+            # da sala. Andar pra trás do móvel e sumir tudo bem: foi
+            # escolha de quem andou. Nascer escondido, não.
+            pos=Pos(x=20 + (hash(uid) % 60), y=10 + (hash(uid[::-1]) % 22)),
             ws=ws,
             conta=conta["id"],
         )
@@ -466,6 +471,23 @@ async def ws_sala(ws: WebSocket, code: str):
 
             elif isinstance(msg, PingIn):
                 await ws.send_json(ev("pong"))
+
+            elif isinstance(msg, DigitandoIn):
+                # Só pros outros: ninguém precisa ver o próprio balãozinho.
+                await room.broadcast(
+                    ev("digitando", uid=uid, ligado=msg.ligado), exceto=uid
+                )
+
+            elif isinstance(msg, BuzinaIn):
+                if not room.buzinar():
+                    await ws.send_json(ev(
+                        "aviso", texto="calma — a buzina tem intervalo"
+                    ))
+                    continue
+                # Vai pra todo mundo, inclusive quem buzinou: o retorno é o
+                # que confirma que funcionou. Sem isso, quem apertou e não
+                # ouviu nada (aba muda, som desligado) aperta de novo.
+                await room.broadcast(ev("buzina", nick=user.nick))
 
             # ---------------------------------------------------- vídeo
             # Quem manda no player é quem está com o controle remoto — um

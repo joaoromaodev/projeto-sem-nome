@@ -30,6 +30,9 @@ MAX_LOBBY = 30
 # sala na lista; mandar os 30 do lobby seria payload à toa.
 AMOSTRA = 6
 
+# Espera mínima entre duas buzinas da mesma sala.
+BUZINA_ESPERA_S = 6.0
+
 SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
@@ -115,6 +118,9 @@ class Room:
         self.controle: str = ""
         self.controle_pos = Pos(x=50, y=80)
 
+        # Última buzina da sala. Ver `buzinar`.
+        self.ultima_buzina = 0.0
+
         self._lock = asyncio.Lock()
 
     # ------------------------------------------------------- controle
@@ -144,6 +150,26 @@ class Room:
             "de": self.controle,
             "pos": self.controle_pos.model_dump(),
         }
+
+    # ---------------------------------------------------------- buzina
+
+    def buzinar(self) -> bool:
+        """Pode buzinar agora? Trava por sala, não por pessoa.
+
+        A trava é por sala de propósito: o incômodo é o barulho na máquina
+        dos outros, e pra quem ouve tanto faz se as dez buzinas vieram de
+        uma pessoa ou de dez. Limitar por pessoa deixaria a sala inteira
+        buzinar em sequência e o efeito seria o mesmo.
+
+        Vale a pena existir mesmo sendo um recurso temporário: som que
+        toca sozinho na máquina alheia é a coisa mais fácil de virar
+        brincadeira, e quem paga é quem está de fone.
+        """
+        agora = time.monotonic()
+        if agora - self.ultima_buzina < BUZINA_ESPERA_S:
+            return False
+        self.ultima_buzina = agora
+        return True
 
     # ------------------------------------------------------------ fila
 
