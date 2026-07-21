@@ -54,7 +54,9 @@ saída dela. Lobby e lista de salas prontos. **No ar em
 - Botões de ir pro lobby, trocar de sala e sair
 - Bonequinho anda (setas, WASD, clique no chão) com ordenação de profundidade
 - Chat com balão de fala sobre a cabeça
-- Sprites de 32×48 em 5 camadas, com recoloração que preserva o sombreado,
+- Sprites de 32×48 em 5 camadas, com recoloração fiel à cor escolhida
+  (verificado: 88 combinações de peça e cor, a cor dominante bate exata),
+  preservando o sombreado,
   pulo com sombra, e catálogo de peças lido da pasta `static/sprites/`
 - Editor de avatar em 2 abas: peças (5 camadas, cores livres) e
   guarda-roupa de até 12 looks
@@ -147,6 +149,8 @@ Não reabrir sem motivo novo.
 | **Movimento previsto no cliente** | O boneco anda na hora; o servidor só conta aos outros. Esperar confirmação deixaria o movimento borrachudo, e movimento borrachudo mata justamente a parte que a galera gostou. |
 | **Identidade vem do cookie** | O WebSocket lê a sessão. Não existe mensagem de "join" com nome — se existisse, qualquer um entraria se dizendo outra pessoa. |
 | **Sem recuperação de senha** | Escopo. Entre amigos, dá pra resetar na mão no banco. |
+| **A cor escolhida aparece exatamente como escolhida** | A primeira versão pegava matiz e saturação da cor nova mas mantinha a **claridade do pixel do sprite** — então a claridade nunca era a escolhida, ela vinha do desenho. Quem pedia o vinho `#7a1030` via um rosa; quem pedia o azul-noite `#23203a` via um lilás claro. **A cor escolhida nunca aparecia na tela.** Agora funciona por deslocamento: cada arte tem um tom base (o mais frequente dela), esse tom recebe os bytes da cor escolhida direto, e os outros tons se movem junto mantendo a distância. Sombra segue sombra e brilho segue brilho, mas agora são os *daquela* cor. |
+| **O tom base é a moda, não a média** | Em pixel art o corpo da peça é uma área chapada grande e as luzes e sombras são detalhes pequenos em volta — a moda cai no corpo, que é o que a pessoa lê como "a cor da roupa". A média cairia entre dois tons e não seria a cor de nenhum pixel; o tom mais claro deixaria a peça inteira mais escura que a escolha. |
 | **Avatar é código, não imagem** | Cabe em <200 bytes, trafega de graça, e não existe upload (nem o custo de moderar upload). |
 | **Uma máquina só no deploy** | O estado da sala vive em memória. Duas máquinas = dois usuários da mesma sala em servidores diferentes, sem se enxergar. |
 | **Fly.io, não o PC de casa** | O projeto vai pro portfólio. Link que só funciona com o PC ligado é inútil pra isso. CGNAT das operadoras também impediria abrir porta. |
@@ -383,9 +387,10 @@ Trocar os bonecos de 8×14 desenhados por código por sprites de verdade.
 ### Tarefas
 
 - [x] `avatar.js` compondo camadas de imagem em vez de gerar pixels
-- [x] Recoloração por matiz preservando a claridade (o sombreado sobrevive);
-      pixel abaixo de 16% de claridade não é recolorido, pra o contorno
-      continuar preto
+- [x] Recoloração **por deslocamento**: o tom base da arte vira exatamente
+      a cor escolhida e o resto se move junto, mantendo a distância que
+      tinha. Pixel abaixo de 16% de claridade não é recolorido, pra o
+      contorno continuar preto
 - [x] Sombra elíptica que encolhe no pulo
 - [x] Catálogo de peças lido da pasta e servido em `/api/pecas` — acrescentar
       roupa é soltar o arquivo e reiniciar, sem tocar em código

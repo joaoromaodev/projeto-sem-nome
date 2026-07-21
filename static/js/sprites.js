@@ -1,8 +1,16 @@
 /* Carrega, recolore e guarda em cache as camadas do boneco.
  *
- * A recoloração preserva a CLARIDADE de cada pixel e troca só o matiz. É
- * isso que faz a mesma arte servir pra qualquer cor: o sombreado que o
- * artista desenhou sobrevive à troca.
+ * A cor escolhida tem que aparecer na tela EXATAMENTE como foi escolhida.
+ * Parece óbvio e não era: a primeira versão pegava o matiz e a saturação
+ * da cor nova mas mantinha a claridade do pixel do sprite. Resultado —
+ * quem escolhia um vinho escuro via um rosa claro, porque a claridade
+ * vinha do desenho e não da escolha. A cor escolhida nunca aparecia.
+ *
+ * Agora funciona por DESLOCAMENTO. Cada arte tem um tom base (o mais
+ * frequente dela); esse tom vira exatamente a cor escolhida, e todo o
+ * resto se move junto, mantendo a distância que tinha pro base. Sombra
+ * continua sombra, brilho continua brilho, mas agora são sombra e brilho
+ * *daquela* cor.
  *
  * Pixel muito escuro fica como está — senão o contorno preto viraria uma
  * versão escura da cor escolhida e o boneco perderia a definição.
@@ -21,6 +29,7 @@ const LIMIAR_CONTORNO = 0.16;   // abaixo disso o pixel não é recolorido
 const cacheImg = new Map();     // url -> Promise<HTMLImageElement|null>
 const imgPronta = new Map();    // url -> HTMLImageElement (só o que já carregou)
 const cachePintado = new Map(); // "arquivo|cor" -> HTMLCanvasElement
+const cacheBase = new Map();    // url -> claridade do tom base daquela arte
 
 /* ------------------------------------------------------------- cor */
 
@@ -78,6 +87,42 @@ function carregar(url) {
   return cacheImg.get(url);
 }
 
+/** Claridade do tom base de uma arte: o valor mais frequente dela.
+ *
+ *  É esse tom que vai virar exatamente a cor escolhida. Usamos o mais
+ *  frequente, e não a média nem o mais claro, porque em pixel art o corpo
+ *  da peça é uma área chapada grande e as luzes e sombras são detalhes
+ *  pequenos em volta — a moda cai no corpo, que é o que a pessoa enxerga
+ *  como "a cor da roupa". A média cairia entre dois tons e não seria a cor
+ *  de nenhum pixel; o mais claro deixaria a peça inteira mais escura que a
+ *  escolha.
+ *
+ *  Depende só da arte, então é calculado uma vez por arquivo.
+ */
+function claridadeBase(chave, d) {
+  if (cacheBase.has(chave)) return cacheBase.get(chave);
+
+  const balde = new Map();
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    const [, , l] = rgbParaHsl(d[i], d[i + 1], d[i + 2]);
+    if (l < LIMIAR_CONTORNO) continue;   // contorno não conta
+    // Agrupa pela claridade exata, sem arredondar em faixas: a arte tem
+    // poucos tons e cada um produz sempre o mesmo valor, então os iguais
+    // caem no mesmo balde sozinhos. Arredondar deslocaria o base por uma
+    // fração, e essa fração reaparece na tela como a cor saindo 1 ou 2
+    // unidades fora da escolhida.
+    balde.set(l, (balde.get(l) || 0) + 1);
+  }
+
+  let base = 0.5, maior = -1;
+  for (const [k, n] of balde) {
+    if (n > maior) { maior = n; base = k; }
+  }
+  cacheBase.set(chave, base);
+  return base;
+}
+
 /** Recolore uma camada e devolve um canvas pronto. Resultado fica em cache
  *  porque isso é caro (percorre 1.536 pixels) e repetiria a cada quadro. */
 function pintar(img, cor) {
@@ -89,15 +134,32 @@ function pintar(img, cor) {
 
   if (!cor) return cv;
 
-  const [hAlvo, sAlvo] = rgbParaHsl(...hexParaRgb(cor));
+  const [rAlvo, gAlvo, bAlvo] = hexParaRgb(cor);
+  const [hAlvo, sAlvo, lAlvo] = rgbParaHsl(rAlvo, gAlvo, bAlvo);
   const dados = ctx.getImageData(0, 0, LARG, ALT);
   const d = dados.data;
+  const lBase = claridadeBase(img.src, d);
 
   for (let i = 0; i < d.length; i += 4) {
     if (d[i + 3] === 0) continue;
     const [, , l] = rgbParaHsl(d[i], d[i + 1], d[i + 2]);
     if (l < LIMIAR_CONTORNO) continue;   // contorno fica preto
-    const [r, g, b] = hslParaRgb(hAlvo, sAlvo, l);
+
+    // O tom base recebe os bytes da cor escolhida direto, sem passar por
+    // HSL. Converter ida e volta arredonda e faz a cor sair 1 ou 2
+    // unidades fora — invisível, mas é justamente a fidelidade que se
+    // pede aqui. Assim o que a pessoa escolheu é literalmente o que vai
+    // pro pixel.
+    if (l === lBase) {
+      d[i] = rAlvo; d[i + 1] = gAlvo; d[i + 2] = bAlvo;
+      continue;
+    }
+
+    // Os outros tons guardam a distância que tinham pro base. Grudar nas
+    // pontas é aceitável: quem escolhe quase-preto abre mão de ver sombra,
+    // e o que importa é a cor pedida sair fiel.
+    const lNovo = Math.min(1, Math.max(0, lAlvo + (l - lBase)));
+    const [r, g, b] = hslParaRgb(hAlvo, sAlvo, lNovo);
     d[i] = r; d[i + 1] = g; d[i + 2] = b;
   }
 
