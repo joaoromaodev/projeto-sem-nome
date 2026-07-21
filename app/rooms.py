@@ -16,6 +16,7 @@ mesmo lugar — é ele a chave dos dois lados.
 """
 
 import asyncio
+import json
 import re
 import time
 from dataclasses import dataclass, field
@@ -128,6 +129,12 @@ class Room:
         linha = db.sala_registrar(code, dono)
         self.musicas_ouvidas = linha["musicas_ouvidas"]
         self.dono = linha["dono"]
+        # O lobby é praça: nunca tranca, aconteça o que acontecer no banco.
+        # Trancado, ele deixaria de ser o destino padrão e quem entrasse
+        # sem sala não teria pra onde ir.
+        self.privada = bool(linha["privada"]) and not self.eh_lobby
+        self.convite = linha["convite"] or ""
+        self.moveis = self._ler_moveis(linha["moveis"])
 
         # O controle remoto é um objeto da sala, não um cargo. Ou está na
         # mão de alguém (`controle` = uid), ou está caído no chão numa
@@ -139,6 +146,60 @@ class Room:
         self.buzinas: list[float] = []
 
         self._lock = asyncio.Lock()
+
+    # ---------------------------------------------------------- móveis
+
+    # Onde a TV e o sofá ficam numa sala que ninguém decorou. São os
+    # mesmos números que estavam fixos no CSS — a sala nova continua
+    # abrindo exatamente como abria antes de existir decoração.
+    MOVEIS_PADRAO = {"tv": {"x": 50.0, "y": 52.0}, "sofa": {"x": 50.0, "y": 14.0}}
+
+    @classmethod
+    def _ler_moveis(cls, cru: str) -> dict:
+        """Lê o JSON da coluna, caindo no padrão a qualquer sinal de lixo.
+
+        Sala sem decoração tem a coluna vazia, que é o caso comum e não é
+        erro. Mas um JSON quebrado também não pode derrubar a sala inteira
+        — móvel fora do lugar é chato, sala que não abre é fatal.
+        """
+        moveis = {k: dict(v) for k, v in cls.MOVEIS_PADRAO.items()}
+        try:
+            salvo = json.loads(cru) if cru else {}
+        except Exception:
+            return moveis
+        if not isinstance(salvo, dict):
+            return moveis
+        for nome, alvo in moveis.items():
+            p = salvo.get(nome)
+            if isinstance(p, dict):
+                for eixo in ("x", "y"):
+                    try:
+                        alvo[eixo] = min(100.0, max(0.0, float(p[eixo])))
+                    except (KeyError, TypeError, ValueError):
+                        pass
+        return moveis
+
+    def mover_movel(self, qual: str, pos: Pos) -> bool:
+        """Arrasta um móvel e grava. Só os móveis que existem de verdade."""
+        if qual not in self.moveis:
+            return False
+        self.moveis[qual] = {"x": pos.x, "y": pos.y}
+        db.salvar_moveis(self.code, self.moveis)
+        return True
+
+    # -------------------------------------------------------- privada
+
+    def pode_entrar(self, uid: int) -> bool:
+        """Sala aberta é de todos; sala trancada é de quem já esteve nela.
+
+        Quem entra por convite vira membro **antes** desta checagem (ver a
+        rota do convite), então "ser membro" é o mesmo que "foi
+        convidado". Isso evita uma lista de permissões separada, que entre
+        amigos ninguém mantém.
+        """
+        if not self.privada:
+            return True
+        return uid == self.dono or db.eh_membro(self.code, uid)
 
     # ------------------------------------------------------- controle
 
@@ -266,6 +327,7 @@ class Room:
             "gente": len(self.users),
             "limite": self.limite,
             "lobby": self.eh_lobby,
+            "privada": self.privada,
             # O que já tocou aqui é o sinal de que a sala tem passado —
             # e, numa sala vazia, é o único sinal que sobra.
             "musicas": self.musicas_ouvidas,
@@ -343,16 +405,20 @@ class RoomManager:
     def existe(self, code: str) -> bool:
         return slugify(code) in self.rooms
 
-    def listar(self) -> list[dict]:
+    def listar(self, uid: int = 0) -> list[dict]:
         """Salas com gente agora, o lobby sempre na frente.
 
         Só entra sala com alguém dentro: sala vazia na lista é convite pra
         entrar num lugar deserto e sair. O lobby é a exceção — ele aparece
         mesmo vazio, porque é o destino padrão e precisa de porta visível.
+
+        Sala trancada não aparece pra quem não é de lá. Mostrar e barrar
+        na porta seria pior que esconder: a lista já entrega **quem está
+        onde**, e é justamente disso que quem trancou quer privacidade.
         """
         vivas = [
             r.resumo() for r in self.rooms.values()
-            if r.users or r.eh_lobby
+            if (r.users or r.eh_lobby) and r.pode_entrar(uid)
         ]
         # lobby primeiro; depois as mais cheias
         vivas.sort(key=lambda s: (not s["lobby"], -s["gente"], s["code"]))

@@ -39,9 +39,8 @@ dessa reação que os avatares saíram da Etapa 3 e viraram Etapa 1.
 
 Etapa 1 concluída e testada. Etapa 2 (YouTube sincronizado) com o código
 todo pronto — falta só o teste com gente de verdade, que é o critério de
-saída dela. Lobby e lista de salas prontos. **Etapa 5 com a fundação de
-pé: a sala tem memória e sobrevive ao restart** (falta sala privada,
-favoritos e decoração). **No ar em
+saída dela. Lobby e lista de salas prontos. **Etapa 5 fechada em código:
+a sala tem memória, dona, tranca, repertório e decoração.** **No ar em
 <https://2gether.fly.dev>.** Repositório público em
 `github.com/joaoromaodev/projeto-sem-nome`.
 
@@ -84,6 +83,13 @@ favoritos e decoração). **No ar em
   entra contando isso no chat; sala nova fica calada
 - **"Suas salas" na home** — as que você frequenta, inclusive as vazias,
   que a lista de descoberta esconde de propósito
+- **Sala privada por link de convite**, com o dono trancando pela barra de
+  título e o link indo pra área de transferência
+- **Favoritos da sala** — o repertório do grupo; clicar num põe na fila
+- **Decoração:** a TV e o sofá são arrastáveis no modo decorar, e onde
+  ficam é estado da sala que todo mundo vê
+- **Quem frequenta**, com o boneco de cada um e apagadinho pra quem não
+  está agora
 
 **Não funciona ainda:** compartilhamento de tela, sala privada, histórico
 da sala.
@@ -110,12 +116,11 @@ Em ordem, quando esta sessão for retomada:
 2. **Receber as 5 camadas de arte** e validar com
    `python ferramentas/conferir_sprites.py`. O usuário estava produzindo a
    partir de uma base de 27×46 que ia expandir pra 32×48.
-3. **Etapa 5 — o que sobrou dela.** A fundação está de pé (salas,
-   histórico e membros no banco). Falta: **sala privada por convite** —
-   agora destravada, porque o `dono` já sobrevive ao restart —, favoritos
-   do grupo, o avatar apagadinho de quem está offline, e decoração (pôr a
-   posição da TV e do sofá no banco, que hoje é fixa no CSS/JS).
-   A Etapa 4 (WebRTC) segue por último de propósito.
+3. **A Etapa 5 fechou.** Sobrou de fora, de propósito: moderação do lobby
+   e tirar a buzina (ver Pendências), e a Etapa 4 (WebRTC), que segue por
+   último porque é a mais frágil e a que menos gerou entusiasmo. Com a
+   Etapa 3 dependendo da arte chegar, **não há mais fatia grande de
+   código pronta pra pegar** — o que falta agora é uso.
 
 ### O que foi verificado, e o que não foi
 
@@ -163,12 +168,48 @@ de que costuma aparecer onde está.
 lugares que mostram o contador (o chat da sala e a linha de "suas salas"),
 porque os dois interpolavam o número direto. Corrigido nos dois.
 
+**Verificado no resto da Etapa 5** (no navegador, medindo o DOM):
+
+- **Decoração:** a sala abre com a TV e o sofá exatamente onde o CSS os
+  punha antes (52% e 14%, z 480 e 860) — trocar posição fixa por estado
+  de sala não mexeu em nada visualmente. O sofá arrastado pra 20%/70%
+  teve o z-index recalculado pra 300, ou seja, a profundidade acompanha:
+  arrastar a TV pra frente do sofá muda quem tapa quem. E ficou lá depois
+  de recarregar.
+- **Favoritos:** a estrela desligada sem vídeo ("nada tocando pra
+  guardar"), ligando quando o vídeo entra, virando ★ ao marcar, o
+  contador subindo, o item aparecendo com o **título** e não com o id, e
+  a linha no chat.
+- **Quem frequenta:** com a bia dentro e a duda fora, a bia sai inteira e
+  marcada "aqui", a duda sai com opacidade 0,38 e `grayscale(1)`.
+- **Sala privada, o ciclo inteiro:** a duda trancou; a bia deixou de ver
+  a sala em `/api/salas`, foi barrada na porta com o motivo certo e sem
+  botão de tranca; abriu o convite, caiu direto na sala, e encontrou os
+  favoritos, o sofá movido e o aviso de que entrou por convite.
+
+**Bug de layout achado aí:** os dois botões novos (estrela e favoritos)
+empurraram a fileira do vídeo pra 1249px. Numa janela de 1024 nada
+estourava — o flex tirava o espaço do único item que encolhe, o
+`#estadovideo`, que ficou com **12px**. Ou seja, o título do que está
+tocando sumia sem nenhum sinal de que algo tinha quebrado. É a pendência
+"não cabe na tela" de novo, e pela terceira vez pelo mesmo motivo:
+componente de largura livre dentro de fileira apertada. Corrigido com
+`flex-wrap` na fileira e piso de 120px no rótulo — a 1024 ele quebra em
+duas linhas e o rótulo recupera 138px; a 1280 continua numa linha só.
+
+**Verificado na migração:** um banco montado com o esquema **de hoje**
+(sem `privada`, `convite` nem `moveis`) ganhou as três colunas no boot,
+com o contador de 42 músicas intacto, e `iniciar()` rodando duas vezes
+sem quebrar.
+
 **NÃO verificado:** a sala persistente com gente de verdade voltando dias
 depois — que é a única forma de saber se "suas salas" faz alguém voltar,
 e é a mesma pergunta em aberto logo abaixo. O screenshot do navegador
-travou nesta sessão; o layout de "suas salas" foi conferido **medindo o
-DOM** (largura 338px dentro da coluna, página sem rolagem horizontal,
-console sem erro), não olhando.
+travou nesta sessão; todo o layout foi conferido **medindo o DOM**, não
+olhando. Também não foi testado: arrastar móvel no **celular** (o código
+usa Pointer Events, que cobre toque, mas ninguém tocou numa tela de
+verdade), nem duas pessoas decorando a mesma sala ao mesmo tempo — o
+último a largar ganha, e ninguém viu isso acontecer.
 
 ### ⚠ A pergunta que ainda não foi respondida
 
@@ -235,6 +276,19 @@ Não reabrir sem motivo novo.
 | **O passado da sala chega pelo chat, não num painel** | Sala que abre com um relatório do lado vira ferramenta, e a tese é que ela seja um lugar. No chat, "342 músicas já tocaram aqui" e "a última foi X, que a duda colocou" chegam como alguém te contando. Sala sem história fica **calada** em vez de anunciar três zeros. |
 | **Quem chega primeiro numa sala nova vira dono** | Não dá poder nenhum hoje. É o gancho da sala privada por convite, que precisa de um dono que sobreviva ao restart — e era exatamente por isso que aquele item estava travado. Entrar depois não muda o dono. |
 | **O lobby não nasce mais no import** | `RoomManager.__init__` criava o lobby na hora de importar o módulo. Montar uma sala hoje **escreve no banco**, e o import acontece antes de `db.iniciar()` ter criado as tabelas. Agora quem chama é o lifespan, depois do banco de pé. |
+| **Sala privada é convite, não lista de permissões** | O dono tranca, o link vai pra área de transferência, ele manda pra quem quiser. Quem abre o link **vira membro** e entra. A porta pergunta uma coisa só: "você é membro desta sala?" — e membro é a mesma tabela que já alimenta "suas salas" e a lista de quem frequenta. Uma lista de permissões separada seria cadastro paralelo pra manter, e entre amigos ninguém mantém. |
+| **Trancar rotaciona o convite** | Destrancar e trancar de novo gera um link **novo**, e o antigo morre. Enquanto a sala esteve aberta o link velho circulou de graça; reaproveitá-lo deixaria entrar todo mundo que passou por ali no meio-tempo. |
+| **Sala trancada não aparece na lista de quem não é de lá** | Mostrar e barrar na porta seria pior que esconder: a lista entrega **quem está onde**, com apelido e avatar, e é exatamente disso que quem trancou quer privacidade. Convite inválido e sala inexistente dão a mesma resposta, pelo mesmo motivo. |
+| **O convite sobrevive ao login** | Quem clica no link sem estar logado é mandado pro login com o convite guardado num cookie de 15 min, e a home o devolve pro convite depois. Sem isso o link viraria "faça login" e morreria ali — que é onde a maioria dos convites morre de verdade. |
+| **O lobby não tranca, nem forçado no banco** | A rota recusa, e o `Room` ignora a coluna se ela vier ligada. O lobby é o destino padrão de quem entra sem sala; trancado, essa gente não teria pra onde ir. Duas travas porque a consequência é a porta da frente do site. |
+| **Favorito é da sala, não de quem clicou** | A chave é (sala, vídeo): duas pessoas marcando a mesma música é uma linha só. Favorito por pessoa seria playlist pessoal — e playlist pessoal não é o que faz um grupo ter repertório. Pelo mesmo motivo não exige o controle remoto: o controle existe pra ninguém brigar pelo play/pause, não pra decidir o que a sala escuta. |
+| **Clicar num favorito põe na fila** | Sem isso a lista seria enfeite: um lugar pra olhar o que já foi bom e não poder fazer nada com isso. Vai pra fila e não pro play direto porque play atropelaria o que está tocando — que é justamente o que o controle remoto existe pra impedir. |
+| **Arrastar móvel só no modo decorar** | Fora dele o sofá deixa o clique passar (`pointer-events: none`) pra clicar nele mandar o boneco andar até lá — a reação esperada de quem clica num sofá. Se o móvel capturasse o ponteiro o tempo todo, mover a mobília custaria o passeio, e o passeio é a parte que a galera gostou. O modo tem contorno tracejado: modo que muda o que o clique faz precisa aparecer na tela. |
+| **O móvel anda na hora e só avisa no fim** | Mesma regra do boneco: posição prevista no cliente, servidor só conta aos outros. E a mensagem sai no `pointerup`, não a cada pixel — mandar durante o arrasto encheria o socket pra desenhar a mesma coisa. O servidor não ecoa de volta pra quem arrastou, senão o móvel daria um pulinho quando a resposta chegasse. |
+| **"Estou arrastando?" é estado explícito, não `hasPointerCapture`** | Dava pra perguntar ao próprio elemento se ele capturou o ponteiro. Mas aí a resposta passa a depender de a captura ter dado certo, e quando ela falha o arrasto morre **em silêncio, sem erro nenhum** — o pior tipo de bug pra diagnosticar. Agora a captura é o que ela é de fato: reforço pra o ponteiro não escapar, dentro de um `try`. |
+| **Quem frequenta abre num popover, não numa janela fixa** | A lista de nomes fixa foi cortada de propósito e continua cortada: quem está **agora** já aparece no chão, com boneco e apelido. "Quem costuma estar aqui?" é outra pergunta, e merece resposta — mas só ocupa tela quando alguém pergunta. |
+| **Offline aparece apagadinho em vez de sumir** | Numa sala vazia, ver os bonecos de quem costuma vir é o que faz o lugar parecer de alguém. Sumindo, sala vazia vira tela em branco — que é exatamente a sensação que a Etapa 5 existe pra evitar. |
+| **A coluna nova precisa de remendo, não só de `CREATE TABLE`** | `CREATE TABLE IF NOT EXISTS` não alcança tabela que já existe, e existe um banco no ar com volume. Sem o `ALTER TABLE` no boot, o deploy sobe, a tabela "já está lá", e o app quebra na primeira consulta que usa a coluna nova — falha que **só aparece em produção**, porque local o banco é sempre recriado do zero. Ver `REMENDOS` em `db.py`. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 
 ---
@@ -516,24 +570,30 @@ isso acontece toda vez que a máquina dorme por falta de gente.
       inserção.
 - [x] Contador visível. Aparece no chat na entrada e na linha da sala em
       "suas salas"
-- [x] Membros: quem frequenta. O avatar já vem na resposta; o desenho
-      apagadinho de quem está offline ainda não foi feito
+- [x] Membros: quem frequenta, com o boneco de cada um e **apagadinho pra
+      quem está offline**. Abre clicando na contagem de gente, num
+      popover — a lista de nomes fixa continua cortada, porque quem está
+      *agora* já aparece no chão. São perguntas diferentes: "quem está
+      aqui?" o chão responde, "quem costuma estar?" não
 - [x] "Suas salas" na home — as que você frequenta, que é exatamente o
       comportamento recorrente que a tese quer premiar
-- [ ] **Sala privada por link de convite.** Decidido que é convite e não
-      lista de permissões: entre amigos, gerenciar permissão é burocracia
-      que ninguém usa. **O bloqueio caiu:** a coluna `dono` já existe e
-      sobrevive ao restart. Falta a lógica de convite.
-- [ ] Favoritos do grupo
-- [ ] Decoração da sala. **Já existe um primeiro passo**: a TV e o sofá
-      são móveis de verdade no `#chao`, com profundidade igual à dos
-      bonecos. Mas a posição das duas está **fixa no CSS/JS** — não é
-      estado de sala, não vem do servidor e ninguém pode mover. Virar
-      decoração de verdade é justamente pôr isso no banco junto com a
-      sala, que é o item de persistência aqui em cima.
-
+- [x] **Sala privada por link de convite.** Convite e não lista de
+      permissões: o dono tranca, o link vai pra área de transferência, e
+      quem abre o link vira membro e entra. A porta pergunta "você é
+      membro?" — a mesma tabela que já alimenta "suas salas" e os
+      frequentadores, sem cadastro paralelo nenhum
+- [x] Favoritos do grupo — o repertório da sala. Clicar num favorito põe
+      na fila, que é o que faz a lista servir pra alguma coisa
+- [x] Decoração: a TV e o sofá viraram estado da sala. Arrastar acontece
+      no **modo decorar**, ligado por um botão
 Esse conjunto é o que faz alguém abrir o site sem motivo específico — que é
 exatamente o comportamento que o projeto quer.
+
+**A etapa está fechada em código.** O que sobra dela é do mesmo tipo do
+resto do projeto: ninguém usou com gente de verdade ainda. Ideias que
+apareceram no caminho e ficam registradas como *não decididas* — mais
+móveis pra decorar (hoje são dois), sentar no sofá, e uma segunda tela pra
+quem quiser assistir em vez de ouvir de fundo.
 
 ---
 

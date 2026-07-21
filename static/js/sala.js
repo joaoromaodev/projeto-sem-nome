@@ -6,7 +6,8 @@
  * serve pra contar aos outros onde eu estou, não pra me dizer onde eu estou.
  */
 
-import { desenhar, LARG, ALT_CANVAS, normalizar, definirManifesto } from "./avatar.js";
+import { desenhar, canvasAvatar, LARG, ALT_CANVAS, normalizar,
+         definirManifesto } from "./avatar.js";
 import { preaquecer } from "./sprites.js";
 import { api } from "./api.js";
 import { montarPainel } from "./editor.js";
@@ -326,6 +327,95 @@ chao.addEventListener("click", (e) => {
     y: clamp(((r.bottom - e.clientY) / r.height) * 100, LIM.y0, LIM.y1),
   };
 });
+
+/* ------------------------------------------------------- decoração
+ *
+ * A TV e o sofá tinham posição fixa no CSS. Agora são estado da sala:
+ * vêm do servidor, valem pra todo mundo e ficam gravadas — que é o que
+ * separa "cenário" de "decoração".
+ *
+ * Arrastar só funciona no **modo decorar**, ligado por um botão. Não é
+ * cerimônia: fora dele o sofá deixa o clique passar (`pointer-events:
+ * none`) justamente pra mandar o boneco andar até ele, que é a reação
+ * esperada de quem clica num sofá. Se o móvel capturasse o ponteiro o
+ * tempo todo, mover a mobília custaria o passeio — e o passeio é a parte
+ * que a galera gostou.
+ */
+
+const MOVEIS = ["tv", "sofa"];
+let moveis = { tv: { x: 50, y: 52 }, sofa: { x: 50, y: 14 } };
+let decorando = false;
+
+function posicionarMovel(qual) {
+  const el = $("#" + qual);
+  const p = moveis[qual];
+  if (!el || !p) return;
+  el.style.left = p.x + "%";
+  el.style.bottom = p.y + "%";
+  // Mesma regra de profundidade dos bonecos e do controle: quem está mais
+  // pra baixo na tela cobre quem está atrás. Sem isto, mover a TV pra
+  // frente do sofá não mudaria quem tapa quem.
+  el.style.zIndex = String(Math.round(1000 - p.y * 10));
+}
+
+function pintarMoveis() {
+  for (const q of MOVEIS) posicionarMovel(q);
+}
+
+function modoDecorar(ligado) {
+  decorando = ligado;
+  chao.classList.toggle("decorando", ligado);
+  $("#decorar").textContent = ligado ? "pronto" : "decorar";
+  if (ligado) sistema("modo decorar: arraste a TV e o sofá pra onde quiser");
+}
+
+$("#decorar").onclick = () => modoDecorar(!decorando);
+
+// Qual móvel está sendo arrastado, e por qual dedo/ponteiro. É um estado
+// explícito de propósito: dava pra perguntar `el.hasPointerCapture(...)`,
+// mas aí "estou arrastando?" passaria a depender de a captura ter dado
+// certo — e se ela falhar, o arrasto morre em silêncio, sem erro nenhum.
+// A captura vira o que ela é de fato: um reforço pra o ponteiro não
+// escapar pro elemento de baixo no meio do movimento.
+let arrasto = null;
+
+for (const qual of MOVEIS) {
+  const el = $("#" + qual);
+
+  el.addEventListener("pointerdown", (e) => {
+    if (!decorando) return;
+    e.preventDefault();
+    e.stopPropagation();          // senão o clique também manda o boneco andar
+    arrasto = { qual, ponteiro: e.pointerId };
+    el.classList.add("pegando");
+    try { el.setPointerCapture(e.pointerId); } catch { /* reforço, não requisito */ }
+  });
+
+  el.addEventListener("pointermove", (e) => {
+    if (!arrasto || arrasto.qual !== qual || arrasto.ponteiro !== e.pointerId) return;
+    const r = chao.getBoundingClientRect();
+    moveis[qual] = {
+      x: clamp(((e.clientX - r.left) / r.width) * 100, 0, 100),
+      y: clamp(((r.bottom - e.clientY) / r.height) * 100, 0, 100),
+    };
+    // Move na hora, sem esperar o servidor: é o mesmo motivo do movimento
+    // do boneco ser previsto no cliente. Móvel que só anda depois da ida
+    // e volta arrasta borrachudo.
+    posicionarMovel(qual);
+  });
+
+  const largar = (e) => {
+    if (!arrasto || arrasto.qual !== qual || arrasto.ponteiro !== e.pointerId) return;
+    arrasto = null;
+    el.classList.remove("pegando");
+    try { el.releasePointerCapture(e.pointerId); } catch { /* já solto */ }
+    // Só no fim do arrasto. Mandar a cada pixel encheria o socket de
+    // mensagens pra desenhar a mesma coisa.
+    enviar({ type: "movel", qual, pos: moveis[qual] });
+  };
+  el.addEventListener("pointerup", largar);
+  el.addEventListener("pointercancel", largar);
+}
 
 /* ------------------------------------------------------------ chat */
 
@@ -672,6 +762,10 @@ function pintarAgora() {
 async function mostrarVideo(est) {
   if (!est || !est.id) return;
   ultimoEstado = est;
+  // A estrela é do vídeo que está tocando, então acompanha a troca. Fica
+  // antes do `await`: depois dele, a tela de "clique pra entrar" pode
+  // devolver o controle antes de a estrela ter sido repintada.
+  pintarBotaoFavoritar();
   await garantirPlayer();
 
   // Sem o gesto do usuário o navegador barra o áudio. A tela de clique é
@@ -861,9 +955,14 @@ $("#verFila").onclick = (e) => {
   e.stopPropagation();
   $("#filaPop").hidden = !$("#filaPop").hidden;
 };
-// clicar fora fecha
+// clicar fora fecha. Os três popovers da barra fecham juntos: abrir um
+// com outro aberto empilharia caixa sobre caixa no mesmo canto.
 document.addEventListener("click", (e) => {
-  if (!e.target.closest(".filaCaixa")) $("#filaPop").hidden = true;
+  if (!e.target.closest(".filaCaixa")) {
+    $("#filaPop").hidden = true;
+    $("#favPop").hidden = true;
+  }
+  if (!e.target.closest("#quantos")) $("#membrosPop").hidden = true;
 });
 
 function pintarFila() {
@@ -888,7 +987,180 @@ function pintarFila() {
   });
 }
 
-$("#sair").onclick = () => sairPara("/");
+/* ------------------------------------------------------- favoritos
+ *
+ * O repertório da sala: o que o grupo marcou pra repetir. É da **sala**,
+ * não de quem clicou — duas pessoas marcando a mesma música é uma linha
+ * só. Favorito por pessoa seria playlist pessoal, e playlist pessoal não
+ * é o que faz um grupo ter repertório.
+ *
+ * Clicar num favorito põe na fila. É o único jeito de ele servir pra
+ * alguma coisa: lista que só se olha é enfeite.
+ */
+
+let favoritosAtual = [];
+
+const estaFavoritado = (id) => favoritosAtual.some((f) => f.video === id);
+
+function pintarFavoritos() {
+  const alvo = $("#favoritos");
+  alvo.textContent = "";
+  $("#favVazio").hidden = favoritosAtual.length > 0;
+  $("#verFavoritos").textContent = `★ ${favoritosAtual.length}`;
+
+  for (const f of favoritosAtual) {
+    const el = document.createElement("div");
+    const qual = document.createElement("span");
+    qual.className = "qual";
+    qual.textContent = f.titulo || f.video;
+    qual.title = `pôr "${f.titulo || f.video}" na fila` +
+                 (f.por ? ` · guardado por ${f.por}` : "");
+    qual.onclick = () => {
+      enviar({ type: "fila_por", video: f.video });
+      $("#favPop").hidden = true;
+    };
+    const x = document.createElement("span");
+    x.className = "tirar";
+    x.textContent = "✕";
+    x.title = "tirar dos favoritos da sala";
+    x.onclick = () => enviar({ type: "favoritar", video: f.video, ligado: false });
+    el.append(qual, x);
+    alvo.appendChild(el);
+  }
+  pintarBotaoFavoritar();
+}
+
+/* A estrela do que está tocando agora. Sem vídeo não há o que guardar,
+   então ela fica desligada em vez de sumir — botão que some muda o
+   layout da barra toda vez que a sala fica sem vídeo. */
+function pintarBotaoFavoritar() {
+  const id = ultimoEstado && ultimoEstado.id;
+  const bt = $("#favoritar");
+  bt.disabled = !id;
+  const marcado = !!id && estaFavoritado(id);
+  bt.classList.toggle("marcado", marcado);
+  bt.textContent = marcado ? "★" : "☆";
+  bt.title = !id
+    ? "nada tocando pra guardar"
+    : (marcado ? "tirar dos favoritos da sala"
+               : "guardar essa nos favoritos da sala");
+}
+
+$("#favoritar").onclick = () => {
+  const id = ultimoEstado && ultimoEstado.id;
+  if (!id) return;
+  enviar({ type: "favoritar", video: id, ligado: !estaFavoritado(id) });
+};
+
+$("#verFavoritos").onclick = (e) => {
+  e.stopPropagation();
+  $("#favPop").hidden = !$("#favPop").hidden;
+};
+
+/* ---------------------------------------------------- quem frequenta
+ *
+ * Os frequentadores da sala, com o boneco de cada um. Quem não está
+ * agora aparece **apagadinho** em vez de sumir: numa sala vazia, ver os
+ * bonecos de quem costuma vir é o que faz o lugar parecer de alguém.
+ * Some de vez e a sala vazia vira tela em branco.
+ */
+
+let membrosAtual = [];
+
+function pintarMembros() {
+  const alvo = $("#membros");
+  alvo.textContent = "";
+
+  // Quem está online agora é sabido pelo apelido, que é o que a lista de
+  // membros carrega — o uid da conexão não vale aqui, porque a mesma
+  // conta abre duas abas com uids diferentes.
+  const online = new Set([...gente.values()].map((p) => p.nick));
+
+  for (const m of membrosAtual) {
+    const el = document.createElement("div");
+    const aqui = online.has(m.nick);
+    el.className = "membro" + (aqui ? "" : " fora");
+
+    el.appendChild(canvasAvatar(normalizar(m.avatar), 1));
+
+    const quem = document.createElement("span");
+    quem.className = "quem3";
+    quem.textContent = m.nick;
+    el.appendChild(quem);
+
+    if (aqui) {
+      const ag = document.createElement("span");
+      ag.className = "agora";
+      ag.textContent = "aqui";
+      el.appendChild(ag);
+    }
+    alvo.appendChild(el);
+  }
+}
+
+$("#quantos").onclick = (e) => {
+  e.stopPropagation();
+  const pop = $("#membrosPop");
+  // Repinta na abertura: quem está online muda o tempo todo, e uma lista
+  // pintada uma vez mostraria "aqui" pra quem já saiu.
+  if (pop.hidden) pintarMembros();
+  pop.hidden = !pop.hidden;
+};
+
+/* ---------------------------------------------------------- tranca
+ *
+ * Convite, não lista de permissões: o dono tranca, copia o link e manda.
+ * Quem abre o link vira membro e entra. Entre amigos, administrar uma
+ * lista de quem pode entrar é burocracia que ninguém mantém.
+ */
+
+let souDono = false;
+let salaPrivada = false;
+
+function pintarTranca() {
+  const bt = $("#tranca");
+  bt.hidden = !souDono;
+  bt.textContent = salaPrivada ? "🔒 trancada" : "🔓 aberta";
+  bt.classList.toggle("fechada", salaPrivada);
+  bt.title = salaPrivada
+    ? "só entra quem tem o convite — clique pra abrir a sala"
+    : "clique pra trancar: só entra quem receber o link";
+}
+
+$("#tranca").onclick = async () => {
+  const querFechar = !salaPrivada;
+  let r;
+  try {
+    r = await fetch(`/api/sala/${encodeURIComponent(codigoReal)}/tranca`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ privada: querFechar }),
+    }).then(async (resp) => {
+      const d = await resp.json().catch(() => null);
+      if (!resp.ok) throw new Error((d && d.detail) || "não deu pra mudar");
+      return d;
+    });
+  } catch (e) {
+    return sistema(e.message);
+  }
+
+  salaPrivada = r.privada;
+  pintarTranca();
+
+  if (!salaPrivada) {
+    return sistema("a sala está aberta de novo — o convite antigo não vale mais");
+  }
+  // O link é a única coisa que o dono precisa fazer com isso, então ele
+  // vai direto pra área de transferência. Se o navegador recusar (sem
+  // permissão, sem HTTPS), o link ainda aparece no chat pra copiar na
+  // mão — falhar em silêncio deixaria o dono sem o convite.
+  try {
+    await navigator.clipboard.writeText(r.link);
+    sistema("sala trancada — o link de convite está na sua área de transferência");
+  } catch {
+    sistema("sala trancada — o convite é: " + esc(r.link));
+  }
+};
 
 $("#sair").onclick = () => sairPara("/");
 $("#trocar").onclick = () => sairPara("/");
@@ -1046,8 +1318,25 @@ function receber(m) {
         controlePos = m.controle.pos || controlePos;
       }
       filaAtual = m.fila || [];
+
+      // O que a sala guardou e como ela está arrumada. Tudo vem do banco,
+      // então uma sala que já existia abre exatamente como foi deixada.
+      favoritosAtual = m.sala.favoritos || [];
+      membrosAtual = m.sala.membros || [];
+      if (m.sala.moveis) moveis = m.sala.moveis;
+      souDono = !!m.sala.sou_dono;
+      salaPrivada = !!m.sala.privada;
+
       pintarControle();
       pintarFila();
+      pintarFavoritos();
+      pintarMoveis();
+      pintarTranca();
+      if (salaPrivada) {
+        sistema(souDono
+          ? "esta sala está trancada — só entra quem tem o seu convite"
+          : "esta sala é trancada; você entrou porque foi convidado");
+      }
       break;
     }
 
@@ -1055,6 +1344,12 @@ function receber(m) {
       if (!gente.has(m.user.uid)) novaPessoa(m.user, false);
       sistema(`${m.user.nick} entrou`);
       pintarLista();
+      // Quem chega agora passa a frequentar a sala. Sem isto, alguém que
+      // entrou depois de mim apareceria no chão mas não em "quem
+      // frequenta" — a lista só é mandada uma vez, no bemvindo.
+      if (!membrosAtual.some((x) => x.nick === m.user.nick)) {
+        membrosAtual.unshift({ nick: m.user.nick, avatar: m.user.avatar });
+      }
       break;
 
     case "saiu":
@@ -1080,6 +1375,10 @@ function receber(m) {
       if (!m.id) {
         sistema("a fila acabou");
         estadoVideo("");
+        // Sem vídeo não há o que guardar: a estrela desliga em vez de
+        // sumir, senão a barra muda de largura toda vez que a fila seca.
+        ultimoEstado = null;
+        pintarBotaoFavoritar();
       } else {
         if (m.daFila) sistema("entrou o próximo da fila");
         else if (m.por) sistema(`${m.por} colocou um vídeo`);
@@ -1117,6 +1416,32 @@ function receber(m) {
       Object.assign(titulos, m.titulos || {});
       pintarFila();
       pintarAgora();
+      // Os favoritos guardam o título junto, e ele pode ter chegado
+      // vazio: sem repintar aqui, a lista fica mostrando o id cru até
+      // alguém recarregar a página.
+      for (const f of favoritosAtual) {
+        if (!f.titulo && titulos[f.video]) f.titulo = titulos[f.video];
+      }
+      pintarFavoritos();
+      break;
+
+    case "favoritos":
+      favoritosAtual = m.favoritos || [];
+      pintarFavoritos();
+      if (m.por) {
+        sistema(m.novo
+          ? `${m.por} guardou "${rotulo(m.novo)}" nos favoritos da sala`
+          : `${m.por} tirou um vídeo dos favoritos`);
+      }
+      break;
+
+    case "movel":
+      // Chega só de quem arrastou (o servidor não ecoa pra ele): quem
+      // mexeu já viu o móvel sob o dedo, e ecoar faria dar um pulinho.
+      if (moveis[m.qual]) {
+        moveis[m.qual] = m.pos;
+        posicionarMovel(m.qual);
+      }
       break;
 
     case "video_estado":

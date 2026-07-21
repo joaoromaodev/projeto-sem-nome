@@ -205,7 +205,10 @@ function cartao(s) {
   nomes.className = "nomes";
   const cod = document.createElement("div");
   cod.className = "cod";
-  cod.textContent = s.lobby ? "lobby" : s.code;
+  // O cadeado só aparece pra quem já enxerga a sala — sala trancada não
+  // entra na lista de quem não é de lá, então quem vê o cadeado é porque
+  // tem acesso. Serve de lembrete, não de porta.
+  cod.textContent = (s.privada ? "🔒 " : "") + (s.lobby ? "lobby" : s.code);
   const quem = document.createElement("div");
   quem.className = "quem2 dim";
   quem.textContent = s.gente

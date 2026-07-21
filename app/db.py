@@ -74,6 +74,18 @@ CREATE TABLE IF NOT EXISTS salas (
     musicas_ouvidas INTEGER NOT NULL DEFAULT 0
 );
 
+-- O que o grupo marcou pra repetir. Chave por (sala, vídeo): favorito é
+-- da sala e não de quem clicou -- duas pessoas favoritando a mesma música
+-- é uma linha, não duas.
+CREATE TABLE IF NOT EXISTS sala_favoritos (
+    code   TEXT NOT NULL REFERENCES salas(code) ON DELETE CASCADE,
+    video  TEXT NOT NULL,
+    titulo TEXT NOT NULL DEFAULT '',
+    por    TEXT NOT NULL DEFAULT '',
+    quando REAL NOT NULL,
+    PRIMARY KEY (code, video)
+);
+
 CREATE TABLE IF NOT EXISTS sala_historico (
     id     INTEGER PRIMARY KEY,
     code   TEXT NOT NULL REFERENCES salas(code) ON DELETE CASCADE,
@@ -106,10 +118,28 @@ def conectar() -> sqlite3.Connection:
     return c
 
 
+# Colunas que nasceram depois da tabela. O `CREATE TABLE IF NOT EXISTS`
+# não alcança um banco que já existe — e existe um no ar, com volume. Sem
+# isto, o deploy sobe, a tabela "já está lá", e o app quebra na primeira
+# consulta que usa a coluna nova. É o tipo de falha que só aparece em
+# produção, porque local o banco é sempre recriado do zero.
+REMENDOS = [
+    ("salas", "privada", "INTEGER NOT NULL DEFAULT 0"),
+    ("salas", "convite", "TEXT NOT NULL DEFAULT ''"),
+    ("salas", "moveis", "TEXT NOT NULL DEFAULT ''"),
+]
+
+
 def iniciar() -> None:
     DB.parent.mkdir(parents=True, exist_ok=True)
     with conectar() as c:
         c.executescript(ESQUEMA)
+        for tabela, coluna, tipo in REMENDOS:
+            existe = {
+                l["name"] for l in c.execute(f"PRAGMA table_info({tabela})")
+            }
+            if coluna not in existe:
+                c.execute(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}")
 
 
 # ------------------------------------------------------------------ senha
@@ -364,10 +394,14 @@ def sala_titular(titulos_novos: dict[str, str]) -> None:
     if not pares:
         return
     with conectar() as c:
-        c.executemany(
-            "UPDATE sala_historico SET titulo = ? WHERE video = ? AND titulo = ''",
-            pares,
-        )
+        # As duas tabelas guardam título pelo mesmo motivo e pelo mesmo
+        # caminho, então são preenchidas juntas — separar daria um
+        # favorito com título e o histórico do mesmo vídeo sem.
+        for tabela in ("sala_historico", "sala_favoritos"):
+            c.executemany(
+                f"UPDATE {tabela} SET titulo = ? WHERE video = ? AND titulo = ''",
+                pares,
+            )
 
 
 def sala_historico(code: str, limite: int = 30) -> list[dict]:
@@ -427,6 +461,115 @@ def minhas_salas(uid: int, limite: int = MINHAS_MAX) -> list[dict]:
             (uid, limite),
         ).fetchall()
     return [dict(l) for l in linhas]
+
+
+# ------------------------------------------------------------- favoritos
+
+# Teto por sala. Favorito sem limite vira segunda fila, e a graça de
+# "o que a gente sempre põe" morre quando são 400 itens.
+FAVORITOS_MAX = 40
+
+
+def favoritar(code: str, video: str, titulo: str, por: str) -> bool:
+    """Marca o vídeo como favorito da sala. False se já estava ou se lotou.
+
+    O favorito é **da sala**, não de quem clicou: a chave é (sala, vídeo).
+    Duas pessoas marcando a mesma música é uma linha só. Favorito por
+    pessoa seria playlist pessoal, e playlist pessoal não é o que faz um
+    grupo ter repertório.
+    """
+    if not video:
+        return False
+    with conectar() as c:
+        (quantos,) = c.execute(
+            "SELECT COUNT(*) FROM sala_favoritos WHERE code = ?", (code,)
+        ).fetchone()
+        if quantos >= FAVORITOS_MAX:
+            raise ErroConta(
+                f"a sala já tem {FAVORITOS_MAX} favoritos — tire um antes"
+            )
+        cur = c.execute(
+            "INSERT OR IGNORE INTO sala_favoritos (code, video, titulo, por, quando)"
+            " VALUES (?,?,?,?,?)",
+            (code, video, titulo, por, time.time()),
+        )
+        return cur.rowcount > 0
+
+
+def desfavoritar(code: str, video: str) -> bool:
+    with conectar() as c:
+        cur = c.execute(
+            "DELETE FROM sala_favoritos WHERE code = ? AND video = ?", (code, video)
+        )
+        return cur.rowcount > 0
+
+
+def favoritos(code: str) -> list[dict]:
+    with conectar() as c:
+        linhas = c.execute(
+            "SELECT video, titulo, por, quando FROM sala_favoritos"
+            " WHERE code = ? ORDER BY quando DESC",
+            (code,),
+        ).fetchall()
+    return [dict(l) for l in linhas]
+
+
+# ---------------------------------------------------------------- móveis
+
+def salvar_moveis(code: str, moveis: dict) -> None:
+    """Onde cada móvel está nesta sala.
+
+    Vai como JSON numa coluna em vez de tabela própria: são dois móveis com
+    duas coordenadas cada, sempre lidos e escritos juntos, e nunca
+    consultados por móvel. Tabela aqui seria cerimônia sem ganho.
+    """
+    with conectar() as c:
+        c.execute("UPDATE salas SET moveis = ? WHERE code = ?",
+                  (json.dumps(moveis), code))
+
+
+# ---------------------------------------------------------- sala privada
+
+def sala_privar(code: str, dono: int, privada: bool) -> str:
+    """Liga ou desliga o cadeado. Devolve o convite atual (vazio se aberta).
+
+    Só o dono mexe, e o WHERE cuida disso: sem `dono` na condição,
+    qualquer um trancaria a sala de qualquer um chutando o código.
+
+    O convite é **rotacionado ao trancar**, nunca reaproveitado: se a sala
+    foi aberta no meio, o link velho circulou de graça, e voltar a fechar
+    com ele deixaria entrar todo mundo que passou por ali.
+    """
+    convite = secrets.token_urlsafe(12) if privada else ""
+    with conectar() as c:
+        cur = c.execute(
+            "UPDATE salas SET privada = ?, convite = ? WHERE code = ? AND dono = ?",
+            (1 if privada else 0, convite, code, dono),
+        )
+        if cur.rowcount == 0:
+            raise ErroConta("só quem abriu a sala pode trancar ou destrancar")
+    return convite
+
+
+def sala_por_convite(convite: str) -> Optional[str]:
+    """Que sala esse convite abre. None se não abre nenhuma."""
+    if not convite:
+        return None
+    with conectar() as c:
+        linha = c.execute(
+            "SELECT code FROM salas WHERE convite = ? AND convite <> ''",
+            (convite,),
+        ).fetchone()
+    return linha["code"] if linha else None
+
+
+def eh_membro(code: str, uid: int) -> bool:
+    with conectar() as c:
+        linha = c.execute(
+            "SELECT 1 FROM sala_membros WHERE code = ? AND usuario = ?",
+            (code, uid),
+        ).fetchone()
+    return linha is not None
 
 
 def limpar_sessoes_velhas() -> None:

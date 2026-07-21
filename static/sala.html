@@ -72,17 +72,33 @@
     pointer-events: none;
   }
 
-  /* Posição e profundidade dos móveis. O z-index segue a mesma regra dos
-     bonecos (1000 − y×10): quem está mais pra baixo na tela está mais à
-     frente e cobre quem está atrás. Por isso a TV encostada no fundo fica
-     atrás de todo mundo, e o sofá lá embaixo fica na frente — um
-     boneco atrás dela some da cintura pra baixo, que é o que se espera.
+  /* Posição e profundidade dos móveis vêm do JS, não daqui.
+     Eles deixaram de ser cenário e viraram decoração: a posição é estado
+     da sala, mora no banco e vale pra todo mundo. O z-index segue a mesma
+     regra dos bonecos (1000 − y×10) — quem está mais pra baixo na tela
+     cobre quem está atrás —, e é o JS que a aplica, senão arrastar a TV
+     pra frente do sofá não mudaria quem tapa quem.
 
-     Os dois agora têm posição fixa: com o móvel em 1× a TV tem 80px e
-     cabe em qualquer janela, então a lógica que escolhia escala pela
-     altura da sala deixou de ter motivo e saiu. */
-  #tv   { left: 50%; bottom: 52%; z-index: 480; }
-  #sofa { left: 50%; bottom: 14%; z-index: 860; }
+     Os valores que estavam aqui (tv 52%, sofá 14%) continuam existindo,
+     mas como `MOVEIS_PADRAO` no servidor: é lá que uma sala nova nasce
+     arrumada. */
+
+  /* ---- modo decorar ----
+     Fora dele o sofá deixa o clique passar de propósito, pra clicar nele
+     mandar o boneco andar até lá. Ligado, os móveis capturam o ponteiro
+     pra poderem ser arrastados — e ganham contorno tracejado, porque um
+     modo que muda o que o clique faz precisa aparecer na tela. */
+  #chao.decorando #tv,
+  #chao.decorando #sofa {
+    pointer-events: auto;
+    cursor: grab;
+    outline: 1px dashed rgba(255,255,255,.75);
+    outline-offset: 2px;
+  }
+  #chao.decorando .pegando { cursor: grabbing; opacity: .8; }
+  /* Enquanto decora, o vídeo não recebe clique: arrastar a TV não pode
+     virar play/pause por acidente. */
+  #chao.decorando #moldura { pointer-events: none; }
 
   /* ---- vídeo, dentro do buraco da TV ----
      O buraco é transparente no PNG, então o vídeo fica ATRÁS da moldura e
@@ -161,7 +177,13 @@
      botões e ficaria estreito justamente no que mais importa. */
   .rodape { flex: none; }
   .rodape .corpo { padding: 6px; display: flex; flex-direction: column; gap: 6px; }
-  .fileira { display: flex; gap: 6px; align-items: center; }
+  /* `wrap` porque a fileira do vídeo cresceu: com favoritos e fila ela
+     passa de 1200px, e numa janela de 1024 o flex tirava o espaço de
+     quem podia encolher — que é justamente o `#estadovideo`, o único
+     item ali que é texto. O resultado era o título do que está tocando
+     espremido a 12px, ou seja, sumido, sem nada estourar a tela pra
+     denunciar. Quebrar a linha é melhor que esconder informação. */
+  .fileira { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .fileira.conversa #dizer { flex: 1; min-width: 0; }
   .fileira.video { font-size: 11px; }
   .divisoria { width: 1px; align-self: stretch; background: var(--sombra); }
@@ -184,8 +206,11 @@
     width: 22px; text-align: right; font-variant-numeric: tabular-nums;
   }
 
+  /* `min-width` e não `0`: sem piso, o flex encolhe este item até o nada
+     antes de quebrar a linha, e o título do que está tocando desaparece
+     em silêncio. Com piso, ele pede uma linha nova em vez de sumir. */
   #estadovideo {
-    flex: 1; min-width: 0;
+    flex: 1; min-width: 120px;
     font-size: 10px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
@@ -220,6 +245,55 @@
     /* recorta só a cabeça do sprite: 6px da esquerda, 4px do topo */
     margin: -4px 0 0 -6px;
   }
+
+  /* ---- quem frequenta ----
+     Abre pra cima porque a barra fica no pé da sala. */
+  #membrosPop {
+    position: absolute; bottom: 100%; left: 0; margin-bottom: 6px;
+    width: 210px; max-height: 220px; overflow-y: auto;
+    background: var(--janela); border: 2px outset var(--claro);
+    padding: 5px 7px; z-index: 3000; font-size: 11px; cursor: default;
+  }
+  #membrosPop .tit { margin-bottom: 3px; }
+  .membro {
+    display: flex; align-items: flex-end; gap: 6px;
+    padding: 1px 0; border-bottom: 1px solid #e0e0e8;
+  }
+  .membro canvas { image-rendering: pixelated; flex: none; }
+  .membro .quem3 { flex: 1; min-width: 0; padding-bottom: 4px;
+                   overflow: hidden; text-overflow: ellipsis;
+                   white-space: nowrap; }
+  /* Quem não está agora aparece apagadinho em vez de sumir: a sala vazia
+     mostrando os bonecos de quem costuma vir é o que faz ela parecer um
+     lugar de alguém, e não uma tela em branco. */
+  .membro.fora { opacity: .38; filter: grayscale(1); }
+  .membro .agora { font-size: 9px; color: #060; flex: none; padding-bottom: 4px; }
+
+  /* ---- favoritos ----
+     Mesma caixa da fila: os dois são listas de vídeo que só interessam
+     quando alguém pergunta por elas. */
+  #favPop {
+    position: absolute; bottom: 100%; right: 0; margin-bottom: 4px;
+    width: 260px; max-height: 200px; overflow-y: auto;
+    background: var(--janela); border: 2px outset var(--claro);
+    padding: 4px 6px; z-index: 3000; font-size: 11px;
+  }
+  #favoritos div {
+    display: flex; align-items: center; gap: 5px;
+    padding: 2px 0; border-bottom: 1px solid #e0e0e8;
+  }
+  #favoritos .qual { flex: 1; min-width: 0; overflow: hidden;
+                     text-overflow: ellipsis; white-space: nowrap;
+                     cursor: pointer; }
+  #favoritos .qual:hover { text-decoration: underline; }
+  #favoritos .tirar { cursor: pointer; color: #a00; font-weight: bold; }
+  #favVazio { padding: 3px 2px; }
+  #favoritar { padding: 4px 8px; font-size: 12px; }
+  #favoritar:disabled { color: #808080; cursor: default; }
+  #favoritar.marcado { color: #b8860b; font-weight: bold; }
+  #verFavoritos { padding: 4px 8px; font-size: 11px; white-space: nowrap; }
+  /* Sala trancada: o cadeado na barra de título. */
+  #tranca.fechada { background: #b8860b; color: #fff; }
 </style>
 </head>
 <body>
@@ -237,6 +311,12 @@
               style="cursor:pointer; width:auto; padding:0 7px;">salas</span>
         <span class="b" id="editar" title="mudar apelido e boneco"
               style="cursor:pointer; width:auto; padding:0 7px;">boneco</span>
+        <span class="b" id="decorar" title="arrastar a TV e o sofá pela sala"
+              style="cursor:pointer; width:auto; padding:0 7px;">decorar</span>
+        <!-- Só aparece pra quem abriu a sala: mostrar pra todo mundo e
+             negar no clique é prometer o que não se cumpre. -->
+        <span class="b" id="tranca" title="trancar a sala" hidden
+              style="cursor:pointer; width:auto; padding:0 7px;">🔓 aberta</span>
         <span class="b" id="sair" title="sair da sala" style="cursor:pointer;">✕</span>
       </div>
       <div class="corpo semfolga">
@@ -273,8 +353,18 @@
           </div>
         </div>
         <div class="barra">
-          <span id="quantos" class="dim" title="quanta gente está na sala">
+          <!-- Clicar na contagem abre quem frequenta a sala. A lista de
+               nomes fixa foi cortada de propósito (os bonecos já estão à
+               vista no chão); esta é outra pergunta — "quem costuma estar
+               aqui?" — e por isso vive num popover que só ocupa tela
+               quando alguém pergunta. -->
+          <span id="quantos" class="dim" title="quem frequenta esta sala"
+                style="position:relative; cursor:pointer;">
             <span class="cabeca"></span><b id="contagem">—</b>
+            <div id="membrosPop" hidden>
+              <div class="tit dim">quem frequenta</div>
+              <div id="membros"></div>
+            </div>
           </span>
           <span id="status" class="off">conectando...</span>
         </div>
@@ -334,6 +424,20 @@
        <button id="pegarControle">pegar</button>
        <span class="divisoria"></span>
        <span id="estadovideo" class="dim"></span>
+       <!-- Favoritar não exige o controle remoto, pelo mesmo motivo que
+            pôr na fila não exige: o controle existe pra ninguém brigar
+            pelo play/pause, não pra decidir o repertório do grupo. -->
+       <button id="favoritar" title="guardar essa nos favoritos da sala"
+               disabled>☆</button>
+       <span class="filaCaixa">
+         <button id="verFavoritos" title="o que a sala guardou pra repetir">★ 0</button>
+         <div id="favPop" hidden>
+           <div id="favoritos"></div>
+           <div id="favVazio" class="dim">
+             a sala ainda não guardou nada
+           </div>
+         </div>
+       </span>
        <span class="filaCaixa">
          <button id="verFila">fila (0)</button>
          <div id="filaPop" hidden>

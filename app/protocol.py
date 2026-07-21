@@ -238,6 +238,44 @@ class ControleSoltarIn(BaseModel):
     type: Literal["controle_soltar"]
 
 
+class FavoritarIn(BaseModel):
+    """Marca (ou desmarca) um vídeo como favorito da sala.
+
+    Não exige o controle remoto, pelo mesmo motivo que pôr na fila não
+    exige: o controle existe pra ninguém brigar pelo play/pause, não pra
+    decidir o repertório do grupo. Repertório é coletivo por definição.
+    """
+
+    type: Literal["favoritar"]
+    video: str
+    ligado: bool = True
+
+    _v = field_validator("video")(extrair_video_id)
+
+
+class MovelIn(BaseModel):
+    """Arrasta um móvel pra outro canto da sala.
+
+    Decoração é da sala e vale pra todo mundo, então passa pelo servidor e
+    fica gravada. Qualquer um mexe: entre amigos, "quem pode mover o sofá"
+    é exatamente o tipo de permissão que ninguém quer administrar.
+    """
+
+    type: Literal["movel"]
+    qual: str
+    pos: Pos
+
+    @field_validator("qual")
+    @classmethod
+    def _qual(cls, v: str) -> str:
+        # Vale só o formato. Se o móvel existe quem sabe é a sala, que tem
+        # a lista — o protocolo não precisa carregar o catálogo junto.
+        v = (v or "").strip().lower()
+        if not PECA_RE.match(v) or not v:
+            raise ValueError("móvel inválido")
+        return v
+
+
 class VideoFimIn(BaseModel):
     """O player avisou que o vídeo acabou.
 
@@ -253,7 +291,8 @@ IncomingT = (ChatIn | MoveIn | AvatarIn | NickIn | PingIn
              | VideoPorIn | VideoPlayIn | VideoPauseIn | VideoSeekIn
              | VideoFimIn | VideoPularIn
              | FilaPorIn | FilaTirarIn
-             | ControlePegarIn | ControleSoltarIn)
+             | ControlePegarIn | ControleSoltarIn
+             | FavoritarIn | MovelIn)
 
 
 class Incoming(BaseModel):

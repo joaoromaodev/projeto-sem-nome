@@ -49,12 +49,22 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
 - **Fila de vídeos** — qualquer um põe, e o próximo entra sozinho
 - **Título de cada vídeo** — na fila, no que está tocando e no cartão da
   sala no lobby, resolvido sem chave de API
+- **A sala tem memória** — quanto já tocou ali, o que já rolou e quem
+  frequenta ficam no banco e sobrevivem ao restart. Ao entrar, a sala
+  conta isso pelo chat; sala nova fica calada
+- **Suas salas** — as que você frequenta, na home, inclusive as vazias
+- **Sala privada por convite** — o dono tranca, o link vai pra área de
+  transferência, e quem abre o link vira membro e entra
+- **Favoritos da sala** — o repertório do grupo; clicar num põe na fila
+- **Decoração** — a TV e o sofá são arrastáveis no modo decorar, e onde
+  ficam vale pra todo mundo
+- **Quem frequenta** — os frequentadores com o boneco de cada um, e
+  apagadinho pra quem não está agora
 
 ## O que ainda não
 
 - Compartilhamento de tela por WebRTC
-- Sala privada — qualquer um logado entra em qualquer sala
-- Histórico da sala — a sala some quando o servidor reinicia; as contas não
+- Moderação — o lobby é aberto e o editor de boneco é livre
 
 ---
 
@@ -294,15 +304,22 @@ terceiros — estão em **[docs/ARTE.md](docs/ARTE.md)**.
 
 ## Limitações conhecidas
 
-- Estado da sala em memória: reiniciou, esvaziou
+- **Presença** vive em memória: reiniciou, a sala esvazia. O que a sala
+  *lembra* (dona, contador, histórico, frequentadores, decoração) está no
+  banco e volta. A separação é de propósito — gravar presença criaria
+  gente fantasma numa sala vazia depois de um crash
+- Uma máquina só: o estado de quem está online não é compartilhado entre
+  instâncias
 - Máximo 12 pessoas por sala e 30 no lobby (`app/rooms.py`)
 - Sem recuperação de senha
 - A arte atual é provisória (andaime gerado por script)
 - Só existe uma vista do boneco, espelhada — falta frente e costas
-- Qualquer um logado entra em qualquer sala se souber o nome
+- Sala aberta: qualquer um logado entra se souber o nome. Trancar é
+  possível, mas é escolha do dono, não o padrão
 - A lista de salas mostra o apelido de todo mundo que está online pra
   qualquer pessoa logada — entre amigos é o objetivo, numa sala aberta ao
-  público é outra conversa
+  público é outra conversa. Sala trancada fica fora dessa lista pra quem
+  não é membro
 - O editor de boneco não cabe na tela: dentro da sala ele passa da altura
   do chão sem rolagem, e na home domina a página. Vai ser reestruturado
   junto com a arte definitiva — ver `docs/PLANO.md`

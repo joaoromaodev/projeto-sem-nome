@@ -17,10 +17,10 @@ from starlette.websockets import WebSocketDisconnect
 
 from . import db, titulos
 from .protocol import (Avatar, AvatarIn, BuzinaIn, ChatIn, ControlePegarIn,
-                       ControleSoltarIn, DigitandoIn, FilaPorIn, FilaTirarIn,
-                       MoveIn, NickIn, PingIn, Pos, VideoFimIn, VideoPauseIn,
-                       VideoPlayIn, VideoPorIn, VideoPularIn, VideoSeekIn,
-                       ev, limpar_nick, parse)
+                       ControleSoltarIn, DigitandoIn, FavoritarIn, FilaPorIn,
+                       FilaTirarIn, MoveIn, MovelIn, NickIn, PingIn, Pos,
+                       VideoFimIn, VideoPauseIn, VideoPlayIn, VideoPorIn,
+                       VideoPularIn, VideoSeekIn, ev, limpar_nick, parse)
 from .rooms import LOBBY, User, Video, manager
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -194,6 +194,13 @@ async def pag_entrar(request: Request):
 async def pag_home(request: Request):
     if not usuario_opcional(request):
         return RedirectResponse("/entrar", 302)
+    # Quem chegou por um convite e teve que criar conta ou entrar volta pro
+    # convite agora, em vez de cair na home sem entender pra onde foi o
+    # link que clicou. Resolver aqui vale pros dois caminhos (login e
+    # cadastro) sem o frontend precisar saber que convite existe.
+    convite = request.cookies.get("convite")
+    if convite:
+        return RedirectResponse("/convite/" + convite, 302)
     return _pagina("index.html")
 
 
@@ -324,7 +331,7 @@ async def salas(u: dict = Depends(usuario)):
 
     Deliberadamente não tem nota nem ranking — ver `Room.resumo()`.
     """
-    return {"salas": manager.listar(), "lobby": LOBBY}
+    return {"salas": manager.listar(u["id"]), "lobby": LOBBY}
 
 
 @app.get("/api/minhas-salas")
@@ -345,6 +352,81 @@ async def minhas_salas(u: dict = Depends(usuario)):
         room = manager.rooms.get(s["code"])
         s["gente"] = len(room.users) if room else 0
     return {"salas": salas}
+
+
+# --------------------------------------------------------- sala privada
+#
+# Convite e não lista de permissões: entre amigos, manter uma lista de quem
+# pode entrar é burocracia que ninguém faz. O dono manda um link, quem abre
+# o link vira membro, e membro entra. A checagem da porta é "você é membro
+# desta sala?" — a mesma tabela que já alimenta "suas salas" e a lista de
+# quem frequenta, sem cadastro paralelo nenhum.
+
+
+class TrancaBody(BaseModel):
+    privada: bool
+
+
+@app.post("/api/sala/{code}/tranca")
+async def trancar(code: str, body: TrancaBody, request: Request,
+                  u: dict = Depends(usuario)):
+    room = manager.get(code)
+    if room.eh_lobby:
+        raise HTTPException(400, "o lobby é praça — não tranca")
+    try:
+        convite = db.sala_privar(room.code, u["id"], body.privada)
+    except db.ErroConta as e:
+        raise HTTPException(403, str(e))
+
+    room.privada = body.privada
+    room.convite = convite
+    return {"privada": room.privada, "link": _link_convite(request, convite)}
+
+
+@app.get("/api/sala/{code}/convite")
+async def ver_convite(code: str, request: Request, u: dict = Depends(usuario)):
+    """O link atual, pro dono copiar de novo sem ter que destrancar."""
+    room = manager.get(code)
+    if room.dono != u["id"]:
+        raise HTTPException(403, "só quem abriu a sala vê o convite")
+    return {"privada": room.privada, "link": _link_convite(request, room.convite)}
+
+
+def _link_convite(request: Request, convite: str) -> str:
+    if not convite:
+        return ""
+    base = str(request.base_url).rstrip("/")
+    return f"{base}/convite/{convite}"
+
+
+@app.get("/convite/{convite}")
+async def aceitar_convite(convite: str, request: Request):
+    """Abrir o link é o aceite. Vira membro e cai dentro da sala.
+
+    Quem não está logado é mandado pro login — e o convite fica guardado
+    num cookie curto pra ele voltar pra cá depois de entrar. Sem isso, o
+    link viraria "faça login" e morreria ali, que é onde a maioria dos
+    convites morre de verdade.
+    """
+    code = db.sala_por_convite(convite)
+    if not code:
+        # Convite que não abre nada e convite de sala apagada dão a mesma
+        # resposta: nada a ganhar contando qual dos dois é.
+        raise HTTPException(404, "esse convite não vale mais")
+
+    u = usuario_opcional(request)
+    if not u:
+        resp = RedirectResponse("/entrar", 302)
+        resp.set_cookie(
+            "convite", convite, max_age=900, httponly=True,
+            samesite="lax", secure=_https(request), path="/",
+        )
+        return resp
+
+    db.sala_visitou(code, u["id"])
+    resp = RedirectResponse("/sala/" + code, 302)
+    resp.delete_cookie("convite", path="/")
+    return resp
 
 
 # ------------------------------------------------------------- peças
@@ -504,6 +586,14 @@ async def ws_sala(ws: WebSocket, code: str):
             await ws.send_json(ev("erro", motivo="sala cheia"))
             return
 
+        # A porta da sala trancada. Vem antes de qualquer coisa: quem não
+        # pode entrar não deve receber nem o roster nem o histórico.
+        if not room.pode_entrar(conta["id"]):
+            await ws.send_json(ev(
+                "erro", motivo="essa sala é privada — peça o link de convite"
+            ))
+            return
+
         user = User(
             uid=uid,
             nick=conta["nick"],
@@ -532,6 +622,13 @@ async def ws_sala(ws: WebSocket, code: str):
                 # inclusive pra quem chega e não tem mais ninguém online.
                 "membros": db.sala_membros(room.code),
                 "historico": db.sala_historico(room.code),
+                "favoritos": db.favoritos(room.code),
+                "moveis": room.moveis,
+                "privada": room.privada,
+                # Só quem abriu a sala vê o botão de trancar. Mostrar pra
+                # todo mundo e negar no clique é prometer o que não se
+                # cumpre.
+                "sou_dono": room.dono == conta["id"],
             },
             gente=room.roster(),
             # Quem chega no meio do filme já entra no ponto certo, em vez
@@ -681,6 +778,44 @@ async def ws_sala(ws: WebSocket, code: str):
                 # pediu também confirma pela verdade do servidor em vez de
                 # confiar no próprio player.
                 await room.broadcast(ev("video_estado", **room.video.estado()))
+
+            elif isinstance(msg, FavoritarIn):
+                # Repertório é coletivo: não exige o controle, pelo mesmo
+                # motivo que pôr na fila não exige.
+                if msg.ligado:
+                    try:
+                        novo = db.favoritar(
+                            room.code, msg.video,
+                            titulos.conhecido(msg.video) or "", user.nick,
+                        )
+                    except db.ErroConta as e:
+                        await ws.send_json(ev("aviso", texto=str(e)))
+                        continue
+                    if not novo:
+                        await ws.send_json(ev(
+                            "aviso", texto="esse já está nos favoritos da sala"
+                        ))
+                        continue
+                elif not db.desfavoritar(room.code, msg.video):
+                    continue
+
+                await room.broadcast(ev(
+                    "favoritos",
+                    favoritos=db.favoritos(room.code),
+                    por=user.nick,
+                    novo=msg.video if msg.ligado else "",
+                ))
+                _pedir_titulos(room, msg.video)
+
+            elif isinstance(msg, MovelIn):
+                # Vai pros outros só: quem arrastou já viu o móvel sob o
+                # dedo. Ecoar de volta faria o móvel dar um pulinho no fim
+                # do arrasto, quando a resposta chegasse.
+                if room.mover_movel(msg.qual, msg.pos):
+                    await room.broadcast(
+                        ev("movel", qual=msg.qual, pos=msg.pos.model_dump()),
+                        exceto=uid,
+                    )
 
             elif isinstance(msg, VideoFimIn):
                 # Chega uma vez por pessoa; a sala trata só a primeira.
