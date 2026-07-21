@@ -129,6 +129,10 @@ Não reabrir sem motivo novo.
 | **Vercel está descartado** | Serverless não segura conexão WebSocket aberta. |
 | **Sem rating de salas** | Foi proposto e recusado. Entre poucos amigos uma nota é dois votos — ruído, não sinal. Ranking cria sala "mal avaliada", que entre amigos é constrangimento. E descoberta por nota é o modelo de lista de servidor público, exatamente o que a tese rejeita. A pergunta real de quem olha a lista não é "essa sala é boa?" e sim "tem gente lá? tem gente que eu conheço?" — por isso a lista mostra **presença**: contagem, apelidos e avatares. |
 | **`apps create`, não `fly launch`** | O `launch` reescreve o `fly.toml` e derrubaria os comentários e os ajustes de volume, região e concorrência. |
+| **O controle é objeto, não cargo** | Podia ser um "host" com botão de passar a vez. Virou um controle remoto que fica no chão da sala, vai pra mão de quem pega e cai de volta quando solta. Cargo é caixa de permissão; objeto é coisa que existe no lugar — e o projeto todo aposta que o valor está em **estar num lugar**. Pegar o controle da mesa é a versão digital de levantar do sofá. |
+| **Pôr na fila não exige o controle** | O controle existe pra duas pessoas não brigarem pelo play/pause, não pra alguém decidir o que a sala assiste. Se pôr na fila exigisse o controle, quem o pegasse viraria porteiro — e a parte coletiva (todo mundo empilhando música) é justamente a graça. |
+| **Sem controles nativos do YouTube** | `controls: 0`, mais um escudo transparente sobre o iframe pra quem não está com o controle. Sem isso os botões do próprio YouTube dariam play e pause a qualquer um, passando por cima do controle remoto e dessincronizando a sala. |
+| **Quem sai larga o controle** | Se o controle sumisse com quem fechou a aba, a sala ficaria travada sem ninguém podendo mexer no vídeo. Ele cai no chão na posição de quem saiu. |
 | **Sala privada depende de persistência** | Sala privada precisa de dono, e dono precisa sobreviver ao restart. Hoje `Room` vive num dict em memória: reiniciou, evaporou o dono junto. Por isso o item foi empurrado pra depois da Etapa 5, e não improvisado agora. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 
@@ -166,13 +170,15 @@ posição esperada e corrigem a sua.
 - [ ] Título do vídeo (hoje aparece só o id; exige a API de dados do
       YouTube, que precisa de chave)
 
-**Papel de host: adiado de propósito, não esquecido.** O plano previa "só
-quem tem o controle manda no player", e a implementação deixou qualquer um
-da sala mexer. Motivo: a referência é a sala de música do Transformice,
-onde o controle era de todos, e host é atrito num grupo de amigos. Começar
-com host seria resolver um problema que ainda não apareceu. Se aparecer
-(alguém trollando o player), o servidor já é a fonte da verdade — dá pra
-acrescentar dono sem redesenhar nada.
+- [x] **Controle remoto como objeto da sala** — resolveu o "papel de host"
+      do plano original, e melhor: em vez de um cargo invisível numa caixa
+      de permissão, é uma **coisa que existe no chão**. Quem quer mandar
+      vai lá e pega; quem terminou devolve, e ela cai onde a pessoa
+      estava. A transferência vira gesto visível e social em vez de
+      configuração — que é exatamente a tese do projeto ("a sala é um
+      lugar", não uma ferramenta).
+- [x] Fila de vídeos por sala (pôr, tirar, pular, e o próximo entra
+      sozinho quando o atual acaba)
 
 ### Armadilhas — ler antes de codar
 

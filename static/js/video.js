@@ -91,7 +91,10 @@ export async function montarPlayer(alvo, callbacks) {
     player = new YT.Player(alvo, {
       width: "100%", height: "100%",
       playerVars: {
-        controls: 1, rel: 0, modestbranding: 1, playsinline: 1,
+        // controls: 0 porque quem manda no vídeo é quem está com o
+        // controle remoto da sala. Deixar os controles nativos do YouTube
+        // daria a qualquer um um play/pause que passa por cima disso.
+        controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1,
         // origin fecha o iframe pro nosso domínio
         origin: location.origin,
       },
@@ -211,6 +214,34 @@ function corrigirDeriva(alvo) {
     if (d.acao === "pular") player.seekTo(d.pos, true);
   });
   return d;
+}
+
+/* ------------------------------------------------------------ comandos
+   Usados por quem está com o controle remoto. Nenhum deles mexe no player
+   direto: todos só devolvem o número que a sala precisa mandar pro
+   servidor. Quem move o player é sempre a resposta do servidor — inclusive
+   pra quem apertou o botão. É isso que garante que os quatro assistam o
+   mesmo instante em vez de cada um obedecer ao próprio clique. */
+
+export function posicaoAtual() {
+  return seguro(() => player.getCurrentTime(), 0);
+}
+
+export function estaTocando() {
+  const e = seguro(() => player.getPlayerState(), -1);
+  return e === YT.PlayerState.PLAYING || e === YT.PlayerState.BUFFERING;
+}
+
+export function duracao() {
+  return seguro(() => player.getDuration(), 0);
+}
+
+/** Posição depois de pular `delta` segundos, presa nos limites do vídeo. */
+export function posicaoRelativa(delta) {
+  const d = duracao();
+  const alvo = posicaoAtual() + delta;
+  if (alvo < 0) return 0;
+  return d > 0 && alvo > d ? d : alvo;
 }
 
 /** Só pra teste e diagnóstico. */

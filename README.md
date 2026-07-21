@@ -37,10 +37,12 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
 
 - **Vídeo do YouTube sincronizado** — cola o link e toca junto pra todo
   mundo; quem chega no meio entra no ponto certo
+- **Controle remoto** — fica no chão da sala; quem pega manda no play,
+  pause, avançar e pular, e devolve quando quiser
+- **Fila de vídeos** — qualquer um põe, e o próximo entra sozinho
 
 ## O que ainda não
 
-- Fila de vídeos (hoje é um de cada vez)
 - Compartilhamento de tela por WebRTC
 - Sala privada — qualquer um logado entra em qualquer sala
 - Histórico da sala — a sala some quando o servidor reinicia; as contas não
@@ -86,10 +88,22 @@ ele acelera ou freia 5% (ninguém percebe, e o vídeo não pula), e só acima de
 2s ele pula. Essa correção suave é o que separa "funciona" de "funciona
 bem" — sem ela o vídeo fica dando pulinhos o tempo todo.
 
-**Qualquer um da sala mexe no player.**
-Não existe host. A referência é a sala de música do Transformice, onde o
-controle era de todos; entre amigos, host é atrito. Como o servidor já é a
-fonte da verdade, acrescentar dono depois não exige redesenhar nada.
+**O controle remoto é um objeto, não um cargo.**
+Quem manda no player é quem está segurando o controle — e ele fica caído no
+chão da sala até alguém ir lá e pegar. Aparece na mão do boneco de quem
+pegou, e cai de volta quando a pessoa devolve ou fecha a aba (se sumisse
+junto com ela, a sala travaria sem ninguém podendo mexer no vídeo).
+
+Um "host" com botão de passar a vez resolveria a mesma disputa. A diferença
+é que cargo é caixa de permissão e objeto é coisa que existe no lugar — e o
+projeto inteiro aposta que o valor está em **estar num lugar**. Pegar o
+controle da mesa é a versão digital de levantar do sofá.
+
+**Mas pôr na fila é livre pra todo mundo.**
+O controle existe pra duas pessoas não brigarem pelo play/pause, não pra
+alguém decidir o que a sala assiste. Se a fila exigisse o controle, quem o
+pegasse viraria porteiro — e todo mundo empilhando música é justamente a
+graça.
 
 **A lista de salas mostra presença, não nota.**
 Chegou a ser considerado um sistema de avaliação das salas, e foi descartado.

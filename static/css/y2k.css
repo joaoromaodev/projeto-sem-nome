@@ -135,6 +135,47 @@ label { user-select: none; }
 }
 .pessoa.eu .nome { color: #ffff80; }
 
+/* ------------------------------------------------- controle remoto
+   É um objeto da sala, não um cargo: ou está caído no chão, ou está na
+   mão de alguém. Desenhado em CSS porque ainda não existe arte — quando
+   existir, é trocar por um sprite sem mexer em lógica. */
+
+.controle {
+  width: 10px; height: 20px;
+  background: linear-gradient(#3a3448, #1a1622);
+  border: 1px solid #000;
+  border-radius: 2px;
+  position: relative;
+  image-rendering: pixelated;
+}
+/* o botãozinho vermelho */
+.controle::after {
+  content: ""; position: absolute;
+  left: 2px; top: 2px; width: 4px; height: 3px;
+  background: #ff2e88; box-shadow: 0 0 3px #ff2e88;
+}
+
+/* Caído no chão: dá pra clicar pra pegar. */
+.controle.chao {
+  position: absolute;
+  transform: translateX(-50%);
+  cursor: pointer;
+  animation: pulsa 1.6s ease-in-out infinite;
+}
+.controle.chao:hover { outline: 2px solid #ffff80; }
+@keyframes pulsa {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255,46,136,.5)); }
+  50%      { filter: drop-shadow(0 0 7px rgba(255,46,136,.95)); }
+}
+
+/* Na mão: pendurado no canto do boneco de quem pegou. */
+.pessoa .controle.mao {
+  position: absolute;
+  right: -6px; bottom: 14px;
+  transform: scale(.85);
+  pointer-events: none;
+}
+
 .balao {
   position: absolute; bottom: 100%; left: 50%;
   transform: translateX(-50%);

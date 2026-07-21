@@ -15,9 +15,11 @@ from pydantic import BaseModel, field_validator
 from starlette.websockets import WebSocketDisconnect
 
 from . import db
-from .protocol import (Avatar, AvatarIn, ChatIn, MoveIn, NickIn, PingIn, Pos,
-                       VideoFimIn, VideoPauseIn, VideoPlayIn, VideoPorIn,
-                       VideoSeekIn, ev, limpar_nick, parse)
+from .protocol import (Avatar, AvatarIn, ChatIn, ControlePegarIn,
+                       ControleSoltarIn, FilaPorIn, FilaTirarIn, MoveIn,
+                       NickIn, PingIn, Pos, VideoFimIn, VideoPauseIn,
+                       VideoPlayIn, VideoPorIn, VideoPularIn, VideoSeekIn,
+                       ev, limpar_nick, parse)
 from .rooms import LOBBY, User, Video, manager
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -310,6 +312,43 @@ async def apagar_look(look_id: int, u: dict = Depends(usuario)):
 
 # ------------------------------------------------------------------ sala
 
+def _pode(room, uid: str, ws: WebSocket) -> bool:
+    """Checa o controle e, se não tiver, avisa quem tentou.
+
+    Avisar importa: sem retorno, quem clica num botão bloqueado acha que o
+    site travou. E o aviso vai só pra quem tentou, não pra sala.
+    """
+    if room.manda(uid):
+        return True
+    dono = room.users.get(room.controle)
+    texto = (f"{dono.nick} está com o controle" if dono
+             else "pegue o controle remoto pra mexer no vídeo")
+    asyncio.create_task(_avisar(ws, texto))
+    return False
+
+
+async def _avisar(ws: WebSocket, texto: str) -> None:
+    try:
+        await ws.send_json(ev("aviso", texto=texto))
+    except Exception:
+        pass
+
+
+async def _passar_adiante(room, quem: str) -> None:
+    """Puxa o próximo da fila. Se a fila secou, para e avisa."""
+    prox = room.proximo()
+    if prox:
+        room.video = Video(id=prox, tocando=True, por=quem)
+        room.video.marcar(0.0, tocando=True)
+        # `daFila` separa "fulano colocou um vídeo" de "entrou o próximo da
+        # fila": quem apertou pular não colocou nada, a fila é que andou.
+        await room.broadcast(ev("video_trocou", **room.video.estado(), daFila=True))
+        await room.broadcast(ev("fila", fila=room.fila, por="", novo=""))
+    else:
+        room.video = Video()
+        await room.broadcast(ev("video_trocou", **room.video.estado()))
+
+
 @app.websocket("/ws/{code}")
 async def ws_sala(ws: WebSocket, code: str):
     # Quem é você vem do cookie, não do que o cliente diz ser.
@@ -346,6 +385,8 @@ async def ws_sala(ws: WebSocket, code: str):
             # Quem chega no meio do filme já entra no ponto certo, em vez
             # de começar do zero e ser puxado pela primeira batida.
             video=room.video.estado(),
+            fila=room.fila,
+            controle=room.controle_estado(),
         ))
         await room.broadcast(ev("entrou", user=user.publico()), exceto=uid)
 
@@ -388,13 +429,52 @@ async def ws_sala(ws: WebSocket, code: str):
                 await ws.send_json(ev("pong"))
 
             # ---------------------------------------------------- vídeo
-            # Não existe papel de host: numa sala de amigos, qualquer um
-            # mexe no player. É de propósito — a referência é a sala de
-            # música do Transformice, onde o controle era de todos. Se
-            # virar bagunça, host entra depois; começar com host seria
-            # resolver um problema que ainda não apareceu.
+            # Quem manda no player é quem está com o controle remoto — um
+            # objeto da sala, não um cargo. Pôr na fila, porém, é livre:
+            # é a parte divertida e coletiva, e barrar isso transformaria
+            # o dono do controle em porteiro. O controle serve pra evitar
+            # que duas pessoas briguem pelo play/pause, não pra decidir o
+            # que a sala assiste.
+
+            elif isinstance(msg, ControlePegarIn):
+                if room.pegar_controle(uid):
+                    await room.broadcast(ev(
+                        "controle", **room.controle_estado(), nick=user.nick
+                    ))
+                else:
+                    dono = room.users.get(room.controle)
+                    await ws.send_json(ev(
+                        "aviso",
+                        texto=f"{dono.nick if dono else 'alguém'} está com o controle",
+                    ))
+
+            elif isinstance(msg, ControleSoltarIn):
+                if room.soltar_controle(uid, user.pos):
+                    await room.broadcast(ev(
+                        "controle", **room.controle_estado(), nick=""
+                    ))
+
+            elif isinstance(msg, FilaPorIn):
+                if not room.video.id:
+                    # Nada tocando: entra direto, sem passar pela fila.
+                    room.video = Video(id=msg.video, tocando=True, por=user.nick)
+                    room.video.marcar(0.0, tocando=True)
+                    await room.broadcast(ev("video_trocou", **room.video.estado()))
+                else:
+                    room.fila.append(msg.video)
+                    await room.broadcast(ev(
+                        "fila", fila=room.fila, por=user.nick, novo=msg.video
+                    ))
+
+            elif isinstance(msg, FilaTirarIn):
+                if msg.video in room.fila:
+                    room.fila.remove(msg.video)
+                    await room.broadcast(ev("fila", fila=room.fila, por="", novo=""))
 
             elif isinstance(msg, VideoPorIn):
+                # Trocar o que está tocando agora exige o controle.
+                if not _pode(room, uid, ws):
+                    continue
                 room.video = Video(id=msg.video, tocando=True, por=user.nick)
                 room.video.marcar(0.0, tocando=True)
                 # Só `video_trocou`: ele já carrega o `por`, e o cliente
@@ -402,8 +482,13 @@ async def ws_sala(ws: WebSocket, code: str):
                 # a mensagem aparecer duas vezes.
                 await room.broadcast(ev("video_trocou", **room.video.estado()))
 
+            elif isinstance(msg, VideoPularIn):
+                if not _pode(room, uid, ws):
+                    continue
+                await _passar_adiante(room, user.nick)
+
             elif isinstance(msg, (VideoPlayIn, VideoPauseIn, VideoSeekIn)):
-                if not room.video.id:
+                if not room.video.id or not _pode(room, uid, ws):
                     continue
                 tocando = not isinstance(msg, VideoPauseIn)
                 room.video.marcar(msg.pos, tocando=tocando)
@@ -414,12 +499,15 @@ async def ws_sala(ws: WebSocket, code: str):
 
             elif isinstance(msg, VideoFimIn):
                 # Chega uma vez por pessoa; a sala trata só a primeira.
+                # Não exige controle: é o player avisando um fato, não
+                # alguém mandando na sala.
                 if room.video_acabou():
                     await room.broadcast(ev(
                         "video_estado",
                         **room.video.estado(),
                         musicas=room.musicas_ouvidas,
                     ))
+                    await _passar_adiante(room, "")
 
     except WebSocketDisconnect:
         pass
@@ -427,8 +515,14 @@ async def ws_sala(ws: WebSocket, code: str):
         pass
     finally:
         if user is not None:
-            await room.remove(uid)
+            tinha_controle = room.controle == uid
+            await room.remove(uid)   # derruba o controle no chão, se tinha
             await room.broadcast(ev("saiu", uid=uid, nick=user.nick))
+            if tinha_controle:
+                await room.broadcast(ev(
+                    "controle", **room.controle_estado(), nick="",
+                    caiu=user.nick,
+                ))
 
 
 app.mount("/", StaticFiles(directory=ESTATICO), name="static")

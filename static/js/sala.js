@@ -357,7 +357,10 @@ function porVideo() {
   const v = $("#link").value.trim();
   if (!v) return $("#link").focus();
   if (!conectado()) return sistema("sem conexão — tenta de novo em instantes");
-  enviar({ type: "video_por", video: v });
+  // Pôr na fila é livre pra todo mundo, mesmo sem o controle: é a parte
+  // coletiva. O controle serve pra ninguém brigar pelo play/pause, não
+  // pra decidir o que a sala assiste.
+  enviar({ type: "fila_por", video: v });
   $("#link").value = "";
   // Quem cola o link está interagindo com a página: o gesto de autoplay
   // já vale, então não faz sentido pedir clique de novo pra essa pessoa.
@@ -366,6 +369,108 @@ function porVideo() {
 
 $("#poriVideo").onclick = porVideo;
 $("#link").addEventListener("keydown", (e) => { if (e.key === "Enter") porVideo(); });
+
+/* ------------------------------------------- controle remoto e fila */
+
+let controleDe = "";           // uid de quem está com ele ("" = no chão)
+let controlePos = { x: 50, y: 80 };
+let filaAtual = [];
+let elControleChao = null;
+
+const euMando = () => controleDe && controleDe === meuUid;
+
+/** O controle deixa de estar onde estava e vai pro lugar novo. */
+function pintarControle() {
+  // tira de onde quer que esteja agora
+  if (elControleChao) { elControleChao.remove(); elControleChao = null; }
+  for (const p of gente.values()) {
+    const m = p.el.querySelector(".controle.mao");
+    if (m) m.remove();
+  }
+
+  if (controleDe) {
+    const dono = gente.get(controleDe);
+    if (dono) {
+      const c = document.createElement("div");
+      c.className = "controle mao";
+      c.title = "está com o controle remoto";
+      dono.el.appendChild(c);
+    }
+  } else {
+    // caído no chão, clicável
+    const c = document.createElement("div");
+    c.className = "controle chao";
+    c.title = "clique pra pegar o controle remoto";
+    c.style.left = controlePos.x + "%";
+    c.style.bottom = controlePos.y + "%";
+    // mesma regra de profundidade dos bonecos: quem está na frente cobre
+    c.style.zIndex = String(Math.round(1000 - controlePos.y * 10));
+    c.onclick = (e) => {
+      e.stopPropagation();          // senão o clique também anda o boneco
+      enviar({ type: "controle_pegar" });
+    };
+    chao.appendChild(c);
+    elControleChao = c;
+  }
+
+  pintarBotoes();
+}
+
+function pintarBotoes() {
+  const meu = euMando();
+  for (const id of ["btVoltar", "btPlay", "btAvancar", "btPular"]) {
+    $("#" + id).disabled = !meu;
+  }
+  // O escudo tapa o iframe de quem não manda.
+  $("#escudo").hidden = meu;
+  $("#pegarControle").textContent = meu ? "devolver" : "pegar";
+  $("#pegarControle").hidden = !!controleDe && !meu;
+
+  if (!controleDe) {
+    $("#quemManda").textContent = "controle remoto no chão";
+  } else if (meu) {
+    $("#quemManda").textContent = "você está com o controle";
+  } else {
+    const d = gente.get(controleDe);
+    $("#quemManda").textContent = `${d ? d.nick : "alguém"} está com o controle`;
+  }
+}
+
+$("#pegarControle").onclick = () => {
+  enviar({ type: euMando() ? "controle_soltar" : "controle_pegar" });
+};
+
+$("#btPlay").onclick = () => {
+  enviar({
+    type: video.estaTocando() ? "video_pause" : "video_play",
+    pos: video.posicaoAtual(),
+  });
+};
+$("#btVoltar").onclick  = () => enviar({ type: "video_seek", pos: video.posicaoRelativa(-10) });
+$("#btAvancar").onclick = () => enviar({ type: "video_seek", pos: video.posicaoRelativa(10) });
+$("#btPular").onclick   = () => enviar({ type: "video_pular" });
+
+function pintarFila() {
+  const alvo = $("#fila");
+  alvo.textContent = "";
+  $("#filaVazia").hidden = filaAtual.length > 0;
+
+  filaAtual.forEach((id, i) => {
+    const el = document.createElement("div");
+    const qual = document.createElement("span");
+    qual.className = "qual";
+    qual.textContent = `${i + 1}. ${id}`;
+    const x = document.createElement("span");
+    x.className = "tirar";
+    x.textContent = "✕";
+    x.title = "tirar da fila";
+    x.onclick = () => enviar({ type: "fila_tirar", video: id });
+    el.append(qual, x);
+    alvo.appendChild(el);
+  });
+}
+
+$("#sair").onclick = () => sairPara("/");
 
 $("#sair").onclick = () => sairPara("/");
 $("#trocar").onclick = () => sairPara("/");
@@ -510,6 +615,13 @@ function receber(m) {
       pintarLista();
       // Quem chega no meio do filme já entra no ponto certo.
       if (m.video && m.video.id) mostrarVideo(m.video);
+      if (m.controle) {
+        controleDe = m.controle.de;
+        controlePos = m.controle.pos || controlePos;
+      }
+      filaAtual = m.fila || [];
+      pintarControle();
+      pintarFila();
       break;
     }
 
@@ -539,8 +651,37 @@ function receber(m) {
     }
 
     case "video_trocou":
-      sistema(`${m.por} colocou um vídeo`);
-      mostrarVideo(m);
+      if (!m.id) {
+        sistema("a fila acabou");
+        estadoVideo("");
+      } else {
+        if (m.daFila) sistema("entrou o próximo da fila");
+        else if (m.por) sistema(`${m.por} colocou um vídeo`);
+        mostrarVideo(m);
+      }
+      break;
+
+    case "controle": {
+      const antes = controleDe;
+      controleDe = m.de;
+      if (m.pos) controlePos = m.pos;
+      pintarControle();
+      if (m.caiu) {
+        sistema(`${m.caiu} saiu e largou o controle`);
+      } else if (m.de && m.de !== antes) {
+        sistema(m.de === meuUid
+          ? "você pegou o controle remoto"
+          : `${m.nick} pegou o controle remoto`);
+      } else if (!m.de && antes) {
+        sistema("o controle voltou pro chão");
+      }
+      break;
+    }
+
+    case "fila":
+      filaAtual = m.fila || [];
+      pintarFila();
+      if (m.novo && m.por) sistema(`${m.por} pôs um vídeo na fila`);
       break;
 
     case "video_estado":

@@ -181,6 +181,40 @@ class VideoSeekIn(BaseModel):
     pos: float = Field(0, ge=0, le=POS_MAX)
 
 
+class FilaPorIn(BaseModel):
+    """Pôr na fila. Não exige o controle — ver a nota em main.py."""
+
+    type: Literal["fila_por"]
+    video: str
+
+    _v = field_validator("video")(extrair_video_id)
+
+
+class FilaTirarIn(BaseModel):
+    type: Literal["fila_tirar"]
+    video: str
+
+    _v = field_validator("video")(extrair_video_id)
+
+
+class VideoPularIn(BaseModel):
+    """Passar pro próximo da fila. Exige o controle."""
+
+    type: Literal["video_pular"]
+
+
+class ControlePegarIn(BaseModel):
+    """Pegar o controle remoto do chão. Só pega quem chegar primeiro."""
+
+    type: Literal["controle_pegar"]
+
+
+class ControleSoltarIn(BaseModel):
+    """Devolver o controle, pra outra pessoa poder pegar."""
+
+    type: Literal["controle_soltar"]
+
+
 class VideoFimIn(BaseModel):
     """O player avisou que o vídeo acabou.
 
@@ -193,7 +227,9 @@ class VideoFimIn(BaseModel):
 
 IncomingT = (ChatIn | MoveIn | AvatarIn | NickIn | PingIn
              | VideoPorIn | VideoPlayIn | VideoPauseIn | VideoSeekIn
-             | VideoFimIn)
+             | VideoFimIn | VideoPularIn
+             | FilaPorIn | FilaTirarIn
+             | ControlePegarIn | ControleSoltarIn)
 
 
 class Incoming(BaseModel):

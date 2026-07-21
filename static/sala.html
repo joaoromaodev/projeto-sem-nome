@@ -65,6 +65,36 @@
   #estadovideo {
     font-size: 10px; padding: 0 6px 5px; min-height: 13px;
   }
+
+  /* Escudo sobre o iframe pra quem não está com o controle. Sem ele, os
+     controles nativos do YouTube deixariam qualquer um dar play e pause
+     direto no iframe, passando por cima do controle remoto. */
+  #escudo {
+    position: absolute; inset: 0; z-index: 4;
+    background: transparent; cursor: not-allowed;
+  }
+
+  .botoes { display: flex; gap: 4px; padding: 5px 5px 0; }
+  .botoes button { flex: 1; padding: 4px 0; font-size: 12px; }
+  .botoes button:disabled { color: #808080; cursor: default; }
+
+  #barraControle {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 6px; font-size: 11px;
+    border-top: 1px solid var(--sombra);
+  }
+  #quemManda { flex: 1; }
+  #pegarControle { padding: 3px 8px; font-size: 11px; white-space: nowrap; }
+
+  #fila { max-height: 92px; overflow-y: auto; font-size: 11px; padding: 0 6px; }
+  #fila div {
+    display: flex; align-items: center; gap: 5px;
+    padding: 2px 0; border-bottom: 1px solid #e0e0e8;
+  }
+  #fila .qual { flex: 1; min-width: 0; overflow: hidden;
+                text-overflow: ellipsis; white-space: nowrap; }
+  #fila .tirar { cursor: pointer; color: #a00; font-weight: bold; }
+  #filaVazia { font-size: 11px; padding: 3px 6px 6px; }
 </style>
 </head>
 <body>
@@ -118,16 +148,32 @@
         <div id="moldura">
           <div id="player"></div>
           <div id="semvideo">cole um link do YouTube aqui embaixo</div>
+          <div id="escudo" title="quem está com o controle remoto manda no vídeo"></div>
           <div id="liberar" hidden>
             <b>▶ clique pra entrar</b>
             <span>o navegador não deixa o som começar sozinho</span>
           </div>
         </div>
+
+        <div class="botoes">
+          <button id="btVoltar"  title="voltar 10s"  disabled>« 10s</button>
+          <button id="btPlay"    title="tocar/pausar" disabled>▶ ‖</button>
+          <button id="btAvancar" title="avançar 10s" disabled>10s »</button>
+          <button id="btPular"   title="próximo da fila" disabled>▶▶</button>
+        </div>
+
+        <div id="barraControle">
+          <span id="quemManda" class="dim">controle remoto no chão</span>
+          <button id="pegarControle">pegar</button>
+        </div>
+
         <div class="linhavideo">
           <input type="text" id="link" placeholder="link do YouTube" autocomplete="off">
-          <button id="poriVideo" style="padding:4px 10px;">pôr</button>
+          <button id="poriVideo" style="padding:4px 10px;">pôr na fila</button>
         </div>
         <div id="estadovideo" class="dim"></div>
+        <div id="fila"></div>
+        <div id="filaVazia" class="dim">a fila está vazia</div>
       </div>
     </div>
 

@@ -106,7 +106,49 @@ class Room:
         self.criada_em = time.time()
         self.musicas_ouvidas = 0
         self.video = Video()
+        self.fila: list[str] = []
+
+        # O controle remoto é um objeto da sala, não um cargo. Ou está na
+        # mão de alguém (`controle` = uid), ou está caído no chão numa
+        # posição (`controle_pos`) de onde qualquer um pode pegar.
+        self.controle: str = ""
+        self.controle_pos = Pos(x=50, y=80)
+
         self._lock = asyncio.Lock()
+
+    # ------------------------------------------------------- controle
+
+    def manda(self, uid: str) -> bool:
+        """Essa pessoa pode mexer no player?"""
+        return bool(self.controle) and self.controle == uid
+
+    def pegar_controle(self, uid: str) -> bool:
+        """Só pega quem chegar primeiro; ninguém tira da mão de ninguém."""
+        if self.controle:
+            return False
+        self.controle = uid
+        return True
+
+    def soltar_controle(self, uid: str, onde: Optional[Pos] = None) -> bool:
+        """Devolve o controle pro chão, onde a pessoa estava."""
+        if self.controle != uid:
+            return False
+        self.controle = ""
+        if onde is not None:
+            self.controle_pos = onde
+        return True
+
+    def controle_estado(self) -> dict:
+        return {
+            "de": self.controle,
+            "pos": self.controle_pos.model_dump(),
+        }
+
+    # ------------------------------------------------------------ fila
+
+    def proximo(self) -> str:
+        """Tira o primeiro da fila e devolve. Vazio se acabou."""
+        return self.fila.pop(0) if self.fila else ""
 
     def video_acabou(self) -> bool:
         """Trata o fim do vídeo uma vez só.
@@ -163,7 +205,13 @@ class Room:
 
     async def remove(self, uid: str) -> Optional[User]:
         async with self._lock:
-            return self.users.pop(uid, None)
+            saiu = self.users.pop(uid, None)
+        # Se a pessoa fechou a aba segurando o controle, ele cai no chão
+        # onde ela estava. Sem isto o controle sumiria com ela e a sala
+        # ficaria sem ninguém podendo mexer no vídeo — travada de vez.
+        if saiu is not None and self.controle == uid:
+            self.soltar_controle(uid, saiu.pos)
+        return saiu
 
     async def broadcast(self, msg: dict, exceto: Optional[str] = None) -> None:
         """Manda pra todo mundo. Conexão morta é descartada em silêncio.
