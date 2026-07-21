@@ -13,8 +13,10 @@ Mas todos tratam a sala como link descartável: cria, manda, acaba. A aposta
 aqui é o contrário — sala fixa, gente recorrente, identidade visual própria.
 
 > **Status:** no ar em **<https://2gether.fly.dev>**. A sala, o chat, as
-> contas, o lobby e o editor de avatar funcionam. A sincronia de vídeo e o
-> compartilhamento de tela ainda não.
+> contas, o lobby, o editor de avatar e a **sincronia de vídeo** funcionam
+> — a sincronia foi testada com 6 pessoas em máquinas diferentes, sem
+> dessincronia perceptível. O compartilhamento de tela (WebRTC) ainda não
+> existe.
 >
 > O caminho completo até o MVP, com as decisões e o porquê de cada uma, está
 > em **[docs/PLANO.md](docs/PLANO.md)**.

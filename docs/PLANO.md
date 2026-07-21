@@ -37,10 +37,11 @@ dessa reação que os avatares saíram da Etapa 3 e viraram Etapa 1.
 
 ## Onde estamos
 
-Etapa 1 concluída e testada. Etapa 2 (YouTube sincronizado) com o código
-todo pronto — falta só o teste com gente de verdade, que é o critério de
-saída dela. Lobby e lista de salas prontos. **Etapa 5 fechada em código:
-a sala tem memória, dona, tranca, repertório e decoração.** **No ar em
+Etapa 1 concluída e testada. **Etapa 2 concluída e testada com gente de
+verdade** — 6 pessoas em máquinas diferentes, sincronia perfeita
+(registrado em 2026-07-21). Lobby e lista de salas prontos. **Etapa 5
+fechada em código: a sala tem memória, dona, tranca, repertório e
+decoração.** **No ar em
 <https://2gether.fly.dev>.** Repositório público em
 `github.com/joaoromaodev/projeto-sem-nome`.
 
@@ -110,9 +111,13 @@ esse script — nenhum código muda.
 
 Em ordem, quando esta sessão for retomada:
 
-1. **Marcar a noite com a galera.** O deploy já está feito e o link é
-   <https://2gether.fly.dev>. Ver "A pergunta que ainda não foi respondida"
-   logo abaixo — continua sendo a tarefa mais importante da lista.
+1. **Esperar uma semana sem marcar nada, e olhar o banco.** A noite já
+   aconteceu e funcionou; o que falta saber é se alguém volta sozinho.
+   Ver "A pergunta que ainda não foi respondida" logo abaixo — continua
+   sendo o item mais importante da lista, e o único que não se resolve
+   escrevendo código. Perguntar a quem estava lá como foi (celular?
+   internet ruim? a buzina?) também vale mais que qualquer tarefa daqui
+   pra baixo.
 2. **Receber as 5 camadas de arte** e validar com
    `python ferramentas/conferir_sprites.py`. O usuário estava produzindo a
    partir de uma base de 27×46 que ia expandir pra 32×48.
@@ -213,12 +218,29 @@ verdade), nem duas pessoas decorando a mesma sala ao mesmo tempo — o
 
 ### ⚠ A pergunta que ainda não foi respondida
 
-**Ninguém usou isso com os amigos de verdade ainda.** A apresentação foi
-validada, o código funciona, mas nenhuma noite real aconteceu.
+**Metade dela foi respondida em 2026-07-21.** A noite real aconteceu: seis
+pessoas, máquinas diferentes, sincronia perfeita. "Isso funciona com gente
+de verdade?" — sim.
 
-A pergunta que decide o projeto é: **eles voltam na semana seguinte sem
-ninguém chamar?** Se a resposta for não, nenhuma quantidade de YouTube ou
-WebRTC salva. Fazer esse teste vale mais que qualquer tarefa da lista abaixo.
+**A outra metade continua aberta, e é a que decide o projeto: eles voltam
+na semana seguinte sem ninguém chamar?**
+
+Não confundir as duas. Uma noite marcada prova que a coisa funciona
+quando alguém organiza; a tese do projeto é que a sala seja um *lugar*, e
+lugar é onde se volta sem convite. Watch2Gether também funciona numa noite
+marcada — é exatamente por isso que "funcionou" não é vitória aqui.
+
+**O que fazer com isso, concretamente:** não marcar a próxima. Deixar a
+semana passar e ver se alguém abre o link sozinho. Se abrirem, a tese se
+sustenta e o próximo trabalho é ampliar o que traz de volta (é o que a
+Etapa 5 apostou: suas salas, frequentadores, repertório). Se não abrirem,
+**nenhuma quantidade de WebRTC ou arte nova salva**, e a pergunta certa
+passa a ser por que não — e essa se responde perguntando a eles, não
+escrevendo código.
+
+O sinal dá pra medir sem interrogar ninguém: as tabelas `sala_membros`
+(`visitas`, `vista_em`) e `salas.musicas_ouvidas` já registram retorno
+por conta e por sala. Basta olhar o banco depois de uma semana.
 
 ---
 
@@ -293,9 +315,11 @@ Não reabrir sem motivo novo.
 
 ---
 
-## Etapa 2 — YouTube sincronizado
+## Etapa 2 — YouTube sincronizado ✅ concluída
 
-A parte tecnicamente difícil do projeto. Estimativa: 5 a 7 dias.
+A parte tecnicamente difícil do projeto. Estimativa era 5 a 7 dias.
+**Fechada em 2026-07-21**, quando o critério de saída foi cumprido com
+gente de verdade — ver o fim desta seção.
 
 ### Arquitetura
 
@@ -442,19 +466,40 @@ deixa tocar fora do YouTube". **Ao testar reprodução, use um vídeo sabido
 livre** ("Me at the zoo", `jNQXAC9IVRw`), senão a investigação vai pro
 lado errado.
 
-**NÃO verificado:** duas pessoas de verdade, em máquinas diferentes,
-assistindo juntas. Todo o teste de sincronia foi feito com um navegador e
-clientes de WebSocket em Python — o que valida o servidor e a lógica, mas
-não a experiência. **É exatamente o critério de saída abaixo, e continua em
-aberto.**
+**Verificado com gente de verdade (2026-07-21):** seis pessoas em
+máquinas diferentes assistindo juntas, **com sincronia perfeita**. Era o
+único item que faltava aqui, e era o que separava "a lógica está certa"
+de "a coisa funciona".
 
-Também não foi testado: internet ruim de verdade (a armadilha 4 tem código,
-mas nunca viu buffering real), nem celular.
+**Ainda não sabemos** (o teste aconteceu, mas estes detalhes não foram
+registrados — vale perguntar a quem estava lá antes de assumir
+qualquer coisa):
 
-### Critério de saída
+- se alguém entrou pelo **celular**, e como foi
+- se alguém pegou **internet ruim** de verdade — a armadilha 4 tem
+  código, mas ninguém confirmou ter visto buffering real e o aviso no
+  chat aparecendo
+- se a **buzina** foi usada, e se incomodou
+- quanto tempo a sessão durou, e o que a galera fez além de assistir
 
-Quatro pessoas em máquinas diferentes assistindo o mesmo vídeo sem perceber
-dessincronia. Aqui já existe produto lançável.
+### Critério de saída — ✅ cumprido em 2026-07-21
+
+Pedia quatro pessoas em máquinas diferentes assistindo o mesmo vídeo sem
+perceber dessincronia. **Aconteceu com seis, e a sincronia foi
+perfeita.**
+
+Vale registrar o que isso significa e o que não significa. A parte
+tecnicamente difícil do projeto — o servidor como fonte da verdade, a
+correção de deriva, o eco suprimido, o autoplay — **funciona fora do
+laboratório**, com latências reais e máquinas que não são a do
+desenvolvedor. Isso era hipótese até aqui; todo o teste anterior tinha
+sido um navegador mais clientes de WebSocket em Python, o que valida a
+lógica e não a experiência.
+
+Pelo critério deste documento, **existe produto lançável a partir daqui.**
+
+O que este teste **não** respondeu: se eles voltam. Ver logo abaixo — é
+outra pergunta, e continua aberta.
 
 ---
 
@@ -599,8 +644,11 @@ quem quiser assistir em vez de ouvir de fundo.
 
 ## Pendências e perguntas abertas
 
-- [ ] **Fazer o teste com os amigos.** É a tarefa mais importante da lista.
-      O link existe: <https://2gether.fly.dev>.
+- [x] **Fazer o teste com os amigos.** Feito em 2026-07-21: 6 pessoas,
+      sincronia perfeita. Fechou a Etapa 2.
+- [ ] **Ver se eles voltam sozinhos.** O que sobrou da tarefa acima, e
+      agora é ela a mais importante da lista. Não marcar a próxima
+      noite; deixar a semana passar e olhar `sala_membros.visitas`.
 - [ ] **O projeto ainda não tem nome.** O endereço público ficou `2gether`
       porque `together` já estava tomado no Fly e era preciso escolher algo
       pra deployar — **não é uma decisão de nome do projeto**. Fica
