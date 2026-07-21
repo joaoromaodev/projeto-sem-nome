@@ -54,14 +54,16 @@ saída dela. Lobby e lista de salas prontos. **No ar em
 - Botões de ir pro lobby, trocar de sala e sair
 - Bonequinho anda (setas, WASD, clique no chão) com ordenação de profundidade
 - Chat com balão de fala sobre a cabeça
-- Sprites de 32×48 em 5 camadas, com recoloração fiel à cor escolhida
-  (verificado: 88 combinações de peça e cor, a cor dominante bate exata),
-  preservando o sombreado,
-  pulo com sombra, e catálogo de peças lido da pasta `static/sprites/`
+- Sprites de 32×48 em 5 camadas, com pulo com sombra e catálogo de peças
+  lido da pasta `static/sprites/`
+- Recoloração **fiel à cor escolhida** e que preserva o sombreado
+  (verificado: 88 combinações de peça e cor, a dominante bate exata)
 - Editor de avatar em 2 abas: peças (5 camadas, cores livres) e
   guarda-roupa de até 12 looks
 - Ferramentas de gerar camadas provisórias e validar sprites
-- Deploy no Fly.io rodando, com volume persistente verificado
+- Deploy no Fly.io rodando, com volume persistente verificado, e o código
+  do cliente servido em endereço versionado por conteúdo — o que garante
+  que um deploy chegue inteiro em vez de pela metade
 - YouTube sincronizado pelo servidor, com correção de deriva; controle
   remoto como objeto da sala; fila de vídeos; título de cada vídeo pelo
   oEmbed, sem chave de API
@@ -119,13 +121,16 @@ composição das 5 camadas com manga cobrindo ou não o braço; recoloração
 mudando os pixels e preservando o contorno; pulo sem cortar a cabeça;
 cookie `secure` ligando só em HTTPS.
 
-**NÃO verificado visualmente:** a sala com os bonecos novos em movimento. O
-painel de preview mantinha a aba com `visibilityState: "hidden"`, e o
-`requestAnimationFrame` não dispara em aba oculta — o laço nunca rodou ali.
-O caminho de desenho foi conferido chamando `desenhar()` na mão, no mesmo
-canvas da sala, com o avatar real da conta: as 5 camadas entram completas nas
-três variações (parado, andando, virado). Ainda assim, **abrir num navegador
-de verdade e confirmar é a primeira coisa a fazer.**
+**Visto num navegador de verdade** (isto aqui já foi pendência e deixou de
+ser): a sala renderizando com móveis, bonecos, balões e vídeo; o laço de
+animação rodando de fato — dá pra afirmar porque é ele que apaga os balões
+no prazo, e eles somem; profundidade funcionando entre boneco, TV e sofá;
+e o layout medido no DOM em vez de olhado por cima.
+
+**NÃO verificado visualmente ainda:** o ciclo de animação em si — o boneco
+**andando** e o pulo com a sombra encolhendo. O que foi conferido é que as
+5 camadas compõem certo nas três variações (parado, andando, virado); ver
+o movimento acontecer, não.
 
 ### ⚠ A pergunta que ainda não foi respondida
 
@@ -460,7 +465,7 @@ isso acontece toda vez que a máquina dorme por falta de gente.
 - [ ] Membros: quem frequenta, com avatar apagadinho pra quem está offline
 - [ ] "Suas salas" no lobby — as que você frequenta, que é exatamente o
       comportamento recorrente que a tese quer premiar
-- [ ] Decoração da sala. **Já existe um primeiro passo**: a TV e a poltrona
+- [ ] Decoração da sala. **Já existe um primeiro passo**: a TV e o sofá
       são móveis de verdade no `#chao`, com profundidade igual à dos
       bonecos. Mas a posição das duas está **fixa no CSS/JS** — não é
       estado de sala, não vem do servidor e ninguém pode mover. Virar

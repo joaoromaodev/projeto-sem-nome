@@ -135,6 +135,20 @@ seja ruído; ranking cria sala "mal avaliada", que entre amigos é
 constrangimento; e descoberta por nota é o modelo de lista de servidor
 público, que é justamente o que a tese deste projeto rejeita.
 
+**A cor escolhida tem que ser a cor que aparece.**
+A recoloração troca a cor de uma arte em tons de qualquer coisa por outra
+qualquer, e a primeira versão fazia o óbvio errado: pegava o matiz e a
+saturação da cor nova e mantinha a claridade do pixel original. Como
+claridade é o que decide se algo é escuro ou claro, a cor pedida nunca
+aparecia — quem escolhia um vinho escuro via um rosa.
+
+A versão certa funciona por deslocamento: cada arte tem um tom base (o
+mais frequente dela), é esse tom que recebe a cor escolhida, e os outros
+se movem junto mantendo a distância que tinham. Sombra continua sombra e
+brilho continua brilho, mas agora são os daquela cor. O tom base é a moda
+e não a média porque em pixel art o corpo da peça é uma área chapada
+grande — a moda cai nela, que é o que a pessoa lê como "a cor da roupa".
+
 **O catálogo de peças é lido da pasta.**
 `/api/pecas` monta a lista a partir de `static/sprites/`. Acrescentar uma
 roupa é soltar o arquivo lá e reiniciar — sem tocar em código nem em banco.
