@@ -381,6 +381,20 @@ const DIGITANDO_REENVIO_MS = 2000;
 let digitandoDesde = 0;
 
 function avisarDigitando(ligado) {
+  /* O balão sobre a SUA cabeça é desenhado aqui, na hora, sem passar pelo
+     servidor. Aqui você enxerga o seu boneco — vê-lo pensando enquanto
+     você escreve é retorno que um chat comum não teria onde dar.
+
+     Local e não pela rede por dois motivos: aparece no primeiro toque de
+     tecla em vez de depois da ida e volta, e continua certo mesmo com a
+     conexão caída. O servidor segue mandando o aviso só pros outros — não
+     faz sentido ele ecoar de volta uma coisa que já sabemos.
+
+     A linha do chat NÃO ganha você junto: "você está digitando..." é
+     ruído. Ela já filtra o próprio uid em `pintarQuemDigita`. */
+  const eu = gente.get(meuUid);
+  if (eu) mostrarDigitando(eu, ligado);
+
   if (!conectado()) return;
   const agora = performance.now();
   if (ligado) {
