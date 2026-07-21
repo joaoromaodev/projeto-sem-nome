@@ -33,6 +33,9 @@ export const api = {
   trocarNick: (nick) => pedir("POST", "/api/nick", { nick }),
   trocarSenha: (atual, nova) => pedir("POST", "/api/senha", { atual, nova }),
 
+  // catálogo de peças; o servidor monta lendo a pasta static/sprites/
+  pecas: () => pedir("GET", "/api/pecas"),
+
   verGuardaRoupa: () => pedir("GET", "/api/guarda-roupa"),
   guardarLook: (nome, avatar) => pedir("POST", "/api/guarda-roupa", { nome, avatar }),
   apagarLook: (id) => pedir("DELETE", `/api/guarda-roupa/${id}`),

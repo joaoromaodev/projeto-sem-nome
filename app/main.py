@@ -215,6 +215,35 @@ async def stats():
     return manager.stats()
 
 
+# ------------------------------------------------------------- peças
+
+CAMADAS = ["pele", "pernas", "sapatos", "torso", "cabelo"]
+
+
+def _manifesto() -> dict[str, list[str]]:
+    """Que peças existem, lido da pasta de sprites.
+
+    Assim acrescentar uma roupa é soltar o arquivo em static/sprites/ e
+    reiniciar — sem tocar em código nem em banco.
+    """
+    pasta = ESTATICO / "sprites"
+    achado: dict[str, list[str]] = {c: [] for c in CAMADAS}
+    if not pasta.is_dir():
+        return achado
+
+    for arq in sorted(pasta.glob("*.png")):
+        nome = arq.stem                       # ex.: "torso-jaqueta"
+        camada, _, peca = nome.partition("-")
+        if camada in achado:
+            achado[camada].append(peca)       # a pele fica com "" (não tem variante)
+    return achado
+
+
+@app.get("/api/pecas")
+async def pecas():
+    return _manifesto()
+
+
 # ------------------------------------------------------------- guarda-roupa
 
 class LookBody(BaseModel):

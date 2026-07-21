@@ -83,11 +83,16 @@
 <script type="module">
 import { api, adiar } from "/js/api.js";
 import { montarPainel } from "/js/editor.js";
-import { normalizar } from "/js/avatar.js";
+import { normalizar, definirManifesto } from "/js/avatar.js";
+import { preaquecer } from "/js/sprites.js";
 
 const $ = (s) => document.querySelector(s);
 
-const conta = await api.eu();
+const [conta, manifesto] = await Promise.all([api.eu(), api.pecas()]);
+// Sem o catálogo, o normalizar() não sabe quais peças valem e zeraria o
+// boneco de todo mundo.
+definirManifesto(manifesto);
+await preaquecer(manifesto);
 const perfil = { nick: conta.nick, avatar: normalizar(conta.avatar) };
 $("#quemSou").textContent = conta.nick;
 
@@ -112,7 +117,7 @@ const gravar = adiar(async () => {
   }
 }, 500);
 
-const painel = montarPainel($("#editor"), perfil, gravar, { px: 8, comNick: true });
+const painel = montarPainel($("#editor"), perfil, gravar, { esc: 3, comNick: true });
 
 /* ---------- sala ---------- */
 $("#sala").value = localStorage.getItem("psn.ultimaSala") || "";

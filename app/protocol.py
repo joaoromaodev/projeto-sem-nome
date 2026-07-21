@@ -8,16 +8,16 @@ Convenção: `type` decide o formato de `payload`. Nunca mandar string solta.
 
 import re
 from typing import Literal, Optional
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 NICK_MAX = 16
 MSG_MAX = 300
 
 
-LARG, ALT = 8, 14           # tamanho do sprite; tem que bater com o avatar.js
-PALETA_MAX = 15             # 15 cores + o "vazio"; assim cada pixel cabe num dígito hex
+LARG, ALT = 32, 48          # tamanho do sprite; tem que bater com o sprites.js
 COR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+PECA_RE = re.compile(r"^[a-z0-9-]{0,24}$")
 
 
 def _cor(v: str) -> str:
@@ -26,66 +26,43 @@ def _cor(v: str) -> str:
     return v.lower()
 
 
+def _peca(v: str) -> str:
+    """Só o formato. Se a peça existe de verdade é o cliente que resolve,
+    olhando o manifesto — o servidor não tem por que saber o catálogo."""
+    v = (v or "").strip().lower()
+    if not PECA_RE.match(v):
+        raise ValueError("nome de peça inválido")
+    return v
+
+
 class Avatar(BaseModel):
-    """Aparência do bonequinho.
+    """Aparência do bonequinho: cinco camadas, cada uma com peça e cor.
 
-    Dois modos:
+    A `pele` é a base e não tem variante — só cor. As outras quatro apontam
+    pra um arquivo em static/sprites/ (ex.: torso="jaqueta" vira
+    torso-jaqueta.png). Peça vazia significa "sem esta camada".
 
-    - `pecas`   — o boneco padrão, com cores livres. É o caminho de quem só
-                  quer escolher e entrar.
-    - `desenho` — o usuário desenhou o dele. `arte` são LARG*ALT dígitos hex,
-                  cada um apontando pra `paleta` ('0' = transparente).
-
-    Mesmo no modo desenho as peças continuam preenchidas: se a arte vier
-    quebrada, dá pra cair no boneco padrão em vez de sumir com a pessoa.
+    Tudo isso cabe em ~150 bytes, então trocar de roupa no meio da sala não
+    pesa na rede.
     """
 
-    modo: Literal["pecas", "desenho"] = "pecas"
+    pele: str = "#ffdbac"
 
-    # índices de forma; o cliente é quem sabe quantas opções existem de cada
-    hair: int = Field(0, ge=0, le=20)      # estilo do cabelo
-    corpo: int = Field(0, ge=0, le=20)     # silhueta do tronco
-    baixo: int = Field(0, ge=0, le=20)     # calça, saia, vestido
-    skin: str = "#ffdbac"
-    hair_c: str = "#2b1a12"
-    shirt: str = "#c02020"
-    pants: str = "#303860"
+    pernas: str = ""
+    pernas_cor: str = "#23203a"
 
-    arte: Optional[str] = None
-    paleta: Optional[list[str]] = None
+    sapatos: str = ""
+    sapatos_cor: str = "#12101a"
 
-    _c = field_validator("skin", "hair_c", "shirt", "pants")(_cor)
+    torso: str = ""
+    torso_cor: str = "#7a1030"
 
-    @field_validator("paleta")
-    @classmethod
-    def _val_paleta(cls, v):
-        if v is None:
-            return None
-        if len(v) > PALETA_MAX:
-            raise ValueError("paleta grande demais")
-        return [_cor(c) for c in v]
+    cabelo: str = ""
+    cabelo_cor: str = "#1a1220"
 
-    @field_validator("arte")
-    @classmethod
-    def _val_arte(cls, v):
-        if v is None:
-            return None
-        if len(v) != LARG * ALT:
-            raise ValueError("tamanho de arte errado")
-        if any(c not in "0123456789abcdef" for c in v.lower()):
-            raise ValueError("arte tem caractere inválido")
-        return v.lower()
-
-    @model_validator(mode="after")
-    def _coerente(self):
-        # Modo desenho sem desenho vira o boneco padrão, em vez de erro.
-        if self.modo == "desenho" and not (self.arte and self.paleta):
-            self.modo = "pecas"
-        if self.arte and self.paleta:
-            maior = max((int(c, 16) for c in self.arte), default=0)
-            if maior > len(self.paleta):
-                raise ValueError("arte aponta pra cor que não existe na paleta")
-        return self
+    _c = field_validator("pele", "pernas_cor", "sapatos_cor",
+                         "torso_cor", "cabelo_cor")(_cor)
+    _p = field_validator("pernas", "sapatos", "torso", "cabelo")(_peca)
 
 
 class Pos(BaseModel):

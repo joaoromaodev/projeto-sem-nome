@@ -127,17 +127,36 @@ def main() -> int:
             erros.append(f"{i['arquivo']}: quase tudo opaco — o fundo não ficou "
                          "transparente?")
 
-    # ---- pés no mesmo lugar ----
-    if pele and pele["caixa"]:
-        base_pe = pele["caixa"][3]
-        print(f"\nPé da 'pele' na linha y={base_pe}")
-        for i in infos:
-            c = camada_de(i["arquivo"])
-            if c in ("sapatos", "pernas") and i["caixa"]:
-                if abs(i["caixa"][3] - base_pe) > 4:
+    # ---- a perna encontra o sapato? ----
+    # Não dá pra comparar com a 'pele': ela é cabeça, braços e mãos — as
+    # pernas moram noutra camada, então o fundo dela não é o pé.
+    pernas = [i for i in infos if camada_de(i["arquivo"]) == "pernas" and i["caixa"]]
+    sapatos = [i for i in infos if camada_de(i["arquivo"]) == "sapatos" and i["caixa"]]
+
+    if pernas and sapatos:
+        print()
+        for s in sapatos:
+            topo_sapato = s["caixa"][1]
+            for p in pernas:
+                fundo_perna = p["caixa"][3]
+                folga = topo_sapato - fundo_perna
+                if folga > 2:
                     avisos.append(
-                        f"{i['arquivo']}: termina em y={i['caixa'][3]}, "
-                        f"longe do pé da pele (y={base_pe}). Vai flutuar ou afundar.")
+                        f"{p['arquivo']} + {s['arquivo']}: sobra {folga}px entre o fim "
+                        "da perna e o começo do sapato — vai aparecer um vão.")
+                elif folga < -8:
+                    avisos.append(
+                        f"{p['arquivo']} + {s['arquivo']}: o sapato cobre {-folga}px "
+                        "da perna. Confira se é intencional (coturno, bota).")
+
+        # tudo tem que se apoiar na mesma linha de chão
+        chao = max(s["caixa"][3] for s in sapatos)
+        print(f"Linha do chão (fundo do sapato mais baixo): y={chao}")
+        for s in sapatos:
+            if chao - s["caixa"][3] > 1:
+                avisos.append(
+                    f"{s['arquivo']}: termina em y={s['caixa'][3]}, mas o chão está "
+                    f"em y={chao}. Este par vai flutuar.")
 
     # ---- camadas que faltam ----
     presentes = {camada_de(i["arquivo"]) for i in infos}

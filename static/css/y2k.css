@@ -172,7 +172,7 @@ label { user-select: none; }
 
 .ed-previa { display: flex; flex-direction: column; align-items: center; gap: 7px; }
 .ed-palco {
-  width: 100%; height: 132px; background: var(--chao);
+  width: 100%; height: 168px; background: var(--chao);
   display: flex; align-items: center; justify-content: center;
 }
 .ed-palco canvas { image-rendering: pixelated; }
@@ -227,38 +227,6 @@ label { user-select: none; }
   border-color: var(--escuro) #fff #fff var(--escuro);
   padding: 0;
 }
-
-/* editor pixel */
-.ed-tela-wrap { display: flex; justify-content: center; padding: 6px; background: #fff; }
-.ed-tela { image-rendering: pixelated; cursor: crosshair; touch-action: none; }
-
-.ed-ferramentas { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
-.ed-cor-atual { display: flex; align-items: center; gap: 5px; font-size: 12px; }
-.ed-cor-atual input[type="color"] {
-  width: 30px; height: 20px; padding: 0; cursor: pointer;
-  border: 2px solid; border-color: var(--sombra) #fff #fff var(--sombra);
-  background: none;
-}
-.ed-amostra {
-  width: 17px; height: 17px; display: inline-block;
-  border: 2px solid; border-color: var(--sombra) #fff #fff var(--sombra);
-}
-.ed-amostra.vazia {
-  background: repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0 0 / 8px 8px;
-}
-.ed-borracha { padding: 3px 9px; font-size: 11px; margin-left: auto; }
-.ed-borracha.ativo {
-  border-color: var(--escuro) #fff #fff var(--escuro);
-  box-shadow: inset 1px 1px 0 var(--sombra);
-}
-
-.ed-usadas {
-  display: flex; flex-wrap: wrap; gap: 3px; align-items: center;
-  margin-top: 8px; font-size: 11px;
-}
-.ed-acoes { display: flex; gap: 5px; margin-top: 8px; }
-.ed-acoes button { flex: 1; padding: 4px; font-size: 11px; }
-.ed-aviso { font-size: 11px; margin-top: 5px; min-height: 14px; color: #a00; }
 
 /* guarda-roupa */
 /* Empilhado, não lado a lado: o painel dentro da sala tem 200px e o botão

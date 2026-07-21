@@ -1,286 +1,170 @@
-/* Bonequinho pixelado, desenhado por código.
+/* O boneco: cinco camadas empilhadas, cada uma com sua cor.
  *
- * Dois modos:
+ * Ordem de empilhamento (de baixo pra cima):
  *
- *   pecas   — boneco padrão. Você escolhe o cabelo e as cores (livres).
- *   desenho — você desenhou o seu. `arte` são 112 dígitos hex, cada um
- *             apontando pra `paleta`; '0' é transparente.
+ *   1. pele      cabeça, braços e mãos
+ *   2. pernas    calça ou saia
+ *   3. sapatos
+ *   4. torso     camisa — vem DEPOIS dos braços de propósito: assim o
+ *                comprimento da manga é decisão da camisa, e manga curta,
+ *                longa e regata saem sem precisar de arte de braço nova
+ *   5. cabelo
  *
- * O sprite é 8x14. Pequeno de propósito: nesse tamanho uma sala cheia
- * continua legível, e desenhar o seu não vira trabalho de meio dia.
+ * Movimento: pulo com sombra, não ciclo de caminhada. Num sprite pequeno o
+ * movimento vertical lê melhor que troca de perna, e um ciclo de 4 quadros
+ * por camada seriam 20 sprites em vez de 5.
  */
 
-export const LARG = 8;
-export const ALT = 14;
-export const PALETA_MAX = 15;
+import { camada, LARG, ALT, ALT_CANVAS, MARGEM_TOPO } from "./sprites.js";
 
-/* Uma linha de folga no topo do canvas.
- *
- * Quando o boneco anda ele sobe 1 pixel. Sem essa folga, a linha 0 — que é
- * justamente o topo da cabeça — era desenhada fora do canvas e sumia. */
-export const MARGEM_TOPO = 1;
-export const ALT_CANVAS = ALT + MARGEM_TOPO;
+export { LARG, ALT, ALT_CANVAS, MARGEM_TOPO };
 
-const OUT = "#2b1a12";
-const EYE = "#ffffff";
+/* Ordem importa: é a ordem de desenho. */
+export const CAMADAS = ["pele", "pernas", "sapatos", "torso", "cabelo"];
 
-/* K=contorno S=pele W=olho B=camisa P=parte de baixo .=vazio */
+/* Quais camadas têm variantes de peça. A pele é a base, não tem escolha. */
+export const COM_PECA = ["pernas", "sapatos", "torso", "cabelo"];
 
-const CABECA = [
-  "..KKKK..",
-  ".KSSSSK.",
-  "KSSSSSSK",
-  "KSSSSSSK",
-  "KSWSSWSK",
-  "KSSSSSSK",
-  ".KSSSSK.",
-];
-
-/* Silhueta do tronco (linhas 7 a 10) */
-const TORSOS = [
-  [".KBBBBK.", "KBBBBBBK", "SBBBBBBS", "KBBBBBBK"],   // médio
-  [".KBBBBK.", ".KBBBBK.", "SKBBBBKS", ".KBBBBK."],   // esguio
-  ["KKBBBBKK", "KBBBBBBK", "SBBBBBBS", "KBBBBBBK"],   // largo
-];
-
-/* Parte de baixo (linhas 11 a 13), parada e no passo */
-const BAIXOS = [
-  { // calça
-    parado: [".KPPPPK.", ".KPP.PPK", ".KK..KK."],
-    passo:  [".KPPPPK.", ".KPPPPK.", "KK....KK"],
-  },
-  { // saia
-    parado: [".KPPPPK.", "KPPPPPPK", ".KS..SK."],
-    passo:  [".KPPPPK.", "KPPPPPPK", "KS....SK"],
-  },
-  { // vestido — a saia segue a cor da camisa
-    parado: [".KBBBBK.", "KBBBBBBK", ".KS..SK."],
-    passo:  [".KBBBBK.", "KBBBBBBK", "KS....SK"],
-  },
-];
-
-export const CORPO_NOMES = ["médio", "esguio", "largo"];
-export const BAIXO_NOMES = ["calça", "saia", "vestido"];
-
-const CABELOS = [
-  ["..HHHH..", ".HHHHHH.", ".H....H."],                            // curto
-  ["..HHHH..", ".HHHHHH.", "HHH..HHH", "HH....HH", "H......H", "H......H"], // comprido
-  ["...HH...", "..HHHH..", "..H..H.."],                            // moicano
-  ["..HHHH..", ".HHHHHH.", ".HHHHHH.", ".H....H."],                // franjão
-  ["...HH...", "..HHHH..", ".HHHHHH.", ".H....H."],                // coque
-  ["..KKKK..", ".K....K."],                                        // careca
-];
-
-export const CABELO_NOMES =
-  ["curto", "comprido", "moicano", "franjão", "coque", "careca"];
-
-/* Cores de atalho — clicar é mais rápido que abrir o seletor.
-   Não são mais limite nenhum: qualquer cor vale. */
 export const SUGESTOES = {
-  skin:   ["#ffdbac", "#f0c8a0", "#d9a066", "#a9714b", "#8d5524", "#5c3317"],
-  hair_c: ["#2b1a12", "#5a3a1a", "#7a3b10", "#c8a415", "#e8d8a0", "#a01818",
-           "#3a3a8c", "#158a5a", "#8c2f8c", "#dddddd"],
-  shirt:  ["#c02020", "#2050c0", "#20a050", "#d0a000", "#802090", "#e07020",
-           "#20a0a0", "#303030", "#f0f0f0", "#c85090"],
-  pants:  ["#303860", "#4a4a4a", "#6b4a2a", "#204020", "#701820", "#1a1a1a"],
+  pele:    ["#ffdbac", "#f0c8a0", "#d9a066", "#a9714b", "#8d5524", "#5c3317"],
+  cabelo:  ["#1a1220", "#3d1f2e", "#7a1030", "#c81e5a", "#ff2e88", "#d8d0e0",
+            "#38e8e0", "#5b3a8c", "#c8a415", "#7a3b10"],
+  torso:   ["#16121e", "#2a1f3d", "#7a1030", "#c81e5a", "#ff2e88", "#38e8e0",
+            "#1f5f5a", "#4a2a6a", "#8c7a20", "#e8e2f0"],
+  pernas:  ["#12101a", "#23203a", "#2e2438", "#3a2a20", "#1c3038", "#4a1c2c"],
+  sapatos: ["#12101a", "#2a2a32", "#4a3020", "#7a1030", "#38e8e0", "#e8e2f0"],
 };
 
 const COR_RE = /^#[0-9a-f]{6}$/i;
-const cor = (v, padrao) => (COR_RE.test(v || "") ? String(v).toLowerCase() : padrao);
+
+/* Preenchido pelo servidor: quais peças existem de fato em static/sprites/.
+   Assim acrescentar uma peça é só soltar o arquivo lá, sem mexer em código. */
+let MANIFESTO = { pele: [""], pernas: [], sapatos: [], torso: [], cabelo: [] };
+
+export function definirManifesto(m) {
+  MANIFESTO = { ...MANIFESTO, ...m };
+}
+
+export function pecasDe(nomeCamada) {
+  return MANIFESTO[nomeCamada] || [];
+}
 
 export function avatarPadrao() {
+  const primeira = (c) => (MANIFESTO[c] && MANIFESTO[c][0]) || "";
   return {
-    modo: "pecas", hair: 0, corpo: 0, baixo: 0,
-    skin: "#ffdbac", hair_c: "#2b1a12", shirt: "#c02020", pants: "#303860",
-    arte: null, paleta: null,
+    pele: "#ffdbac",
+    pernas: primeira("pernas"),   pernas_cor: "#23203a",
+    sapatos: primeira("sapatos"), sapatos_cor: "#12101a",
+    torso: primeira("torso"),     torso_cor: "#7a1030",
+    cabelo: primeira("cabelo"),   cabelo_cor: "#1a1220",
   };
 }
 
 export function avatarAleatorio() {
   const p = (a) => a[Math.floor(Math.random() * a.length)];
-  const n = (max) => Math.floor(Math.random() * max);
+  const peca = (c) => {
+    const lista = MANIFESTO[c] || [];
+    return lista.length ? p(lista) : "";
+  };
   return {
-    modo: "pecas",
-    hair: n(CABELOS.length),
-    corpo: n(TORSOS.length),
-    baixo: n(BAIXOS.length),
-    skin: p(SUGESTOES.skin),
-    hair_c: p(SUGESTOES.hair_c),
-    shirt: p(SUGESTOES.shirt),
-    pants: p(SUGESTOES.pants),
-    arte: null, paleta: null,
+    pele: p(SUGESTOES.pele),
+    pernas: peca("pernas"),   pernas_cor: p(SUGESTOES.pernas),
+    sapatos: peca("sapatos"), sapatos_cor: p(SUGESTOES.sapatos),
+    torso: peca("torso"),     torso_cor: p(SUGESTOES.torso),
+    cabelo: peca("cabelo"),   cabelo_cor: p(SUGESTOES.cabelo),
   };
 }
-
-/* Combinações prontas. Não travam nada: são só um ponto de partida, e
- * qualquer peça continua livre pra trocar depois. */
-export const PRESETS = {
-  masculino: { corpo: 2, baixo: 0, hair: 0 },
-  feminino:  { corpo: 1, baixo: 1, hair: 1 },
-};
 
 /** Conserta o que vier torto em vez de quebrar a tela de todo mundo. */
 export function normalizar(a) {
   const d = avatarPadrao();
   a = a || {};
 
-  const idx = (v, max) =>
-    Number.isFinite(+v) ? ((Math.floor(+v) % max) + max) % max : 0;
-
-  const av = {
-    modo: a.modo === "desenho" ? "desenho" : "pecas",
-    hair: idx(a.hair, CABELOS.length),
-    corpo: idx(a.corpo, TORSOS.length),
-    baixo: idx(a.baixo, BAIXOS.length),
-    skin: cor(a.skin, d.skin),
-    hair_c: cor(a.hair_c, d.hair_c),
-    shirt: cor(a.shirt, d.shirt),
-    pants: cor(a.pants, d.pants),
-    arte: null,
-    paleta: null,
+  const cor = (v, padrao) => (COR_RE.test(v || "") ? String(v).toLowerCase() : padrao);
+  const peca = (v, nomeCamada, padrao) => {
+    const lista = MANIFESTO[nomeCamada] || [];
+    return lista.includes(v) ? v : padrao;
   };
 
-  const arteOk = typeof a.arte === "string"
-    && a.arte.length === LARG * ALT
-    && /^[0-9a-f]+$/i.test(a.arte);
-  const paletaOk = Array.isArray(a.paleta)
-    && a.paleta.length <= PALETA_MAX
-    && a.paleta.every((c) => COR_RE.test(c));
-
-  if (arteOk && paletaOk) {
-    av.arte = a.arte.toLowerCase();
-    av.paleta = a.paleta.map((c) => c.toLowerCase());
-  } else {
-    // arte quebrada: cai no boneco padrão em vez de sumir com a pessoa
-    av.modo = "pecas";
-  }
-
-  return av;
-}
-
-/* ------------------------------------------------------------- grade */
-
-/** Devolve LARG*ALT cores (ou null = transparente). */
-export function grade(av, andando = false) {
-  av = normalizar(av);
-
-  if (av.modo === "desenho") {
-    const g = [];
-    for (let y = 0; y < ALT; y++) {
-      const linha = [];
-      for (let x = 0; x < LARG; x++) {
-        const i = parseInt(av.arte[y * LARG + x], 16);
-        linha.push(i === 0 ? null : (av.paleta[i - 1] || null));
-      }
-      g.push(linha);
-    }
-    return g;
-  }
-
-  const mapa = {
-    K: OUT, W: EYE,
-    S: av.skin, B: av.shirt, P: av.pants, H: av.hair_c,
+  return {
+    pele: cor(a.pele, d.pele),
+    pernas: peca(a.pernas, "pernas", d.pernas),
+    pernas_cor: cor(a.pernas_cor, d.pernas_cor),
+    sapatos: peca(a.sapatos, "sapatos", d.sapatos),
+    sapatos_cor: cor(a.sapatos_cor, d.sapatos_cor),
+    torso: peca(a.torso, "torso", d.torso),
+    torso_cor: cor(a.torso_cor, d.torso_cor),
+    cabelo: peca(a.cabelo, "cabelo", d.cabelo),
+    cabelo_cor: cor(a.cabelo_cor, d.cabelo_cor),
   };
-
-  const baixo = BAIXOS[av.baixo];
-  const linhas = [
-    ...CABECA,
-    ...TORSOS[av.corpo],
-    ...(andando ? baixo.passo : baixo.parado),
-  ];
-
-  const g = linhas.map((l) => l.split("").map((c) => (c === "." ? null : mapa[c])));
-
-  CABELOS[av.hair].forEach((linha, y) => {
-    if (y >= ALT) return;
-    linha.split("").forEach((c, x) => {
-      if (c === ".") return;
-      g[y][x] = c === "K" ? OUT : mapa.H;
-    });
-  });
-
-  return g;
 }
 
-/** Pega o boneco atual e devolve {arte, paleta} — o ponto de partida do
- *  editor pixel a pixel. É o "template padrão" pra começar a desenhar. */
-export function paraArte(av) {
-  const g = grade(av, false);
-  const paleta = [];
-  const idx = new Map();
-  let arte = "";
+function arquivoDe(nomeCamada, av) {
+  if (nomeCamada === "pele") return "pele.png";
+  const peca = av[nomeCamada];
+  return peca ? `${nomeCamada}-${peca}.png` : null;
+}
 
-  for (let y = 0; y < ALT; y++) {
-    for (let x = 0; x < LARG; x++) {
-      const c = g[y][x];
-      if (!c) { arte += "0"; continue; }
-      if (!idx.has(c)) {
-        if (paleta.length >= PALETA_MAX) { arte += "0"; continue; }
-        paleta.push(c);
-        idx.set(c, paleta.length);
-      }
-      arte += idx.get(c).toString(16);
-    }
+function corDe(nomeCamada, av) {
+  return nomeCamada === "pele" ? av.pele : av[`${nomeCamada}_cor`];
+}
+
+/**
+ * Desenha o boneco.
+ *
+ * @param esc      escala inteira (2 = cada pixel do sprite vira 2x2 na tela)
+ * @param andando  aplica o pulo
+ * @param virado   espelha na horizontal
+ * @param sombra   desenha a sombra do chão (encolhe no pulo)
+ */
+export function desenhar(ctx, avatar, opts = {}) {
+  const { esc = 2, andando = false, virado = false, sombra = true } = opts;
+  const av = normalizar(avatar);
+
+  const L = LARG * esc;
+  const A = ALT_CANVAS * esc;
+  ctx.clearRect(0, 0, L, A);
+  ctx.imageSmoothingEnabled = false;
+
+  const salto = andando ? -2 * esc : 0;
+
+  // A sombra fica no chão e encolhe quando o boneco sobe. É ela que faz o
+  // pulo parecer intenção, e não falha de desenho.
+  if (sombra) {
+    const raio = (andando ? 7 : 9.5) * esc;
+    ctx.save();
+    ctx.fillStyle = "rgba(0,0,0,.34)";
+    ctx.beginPath();
+    ctx.ellipse(L / 2, A - 1.2 * esc, raio, 2.2 * esc, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
-  return { arte, paleta };
-}
 
-/** Caminho inverso: grade de cores -> {arte, paleta} compactos. */
-export function daGrade(g) {
-  const paleta = [];
-  const idx = new Map();
-  let arte = "";
-
-  for (let y = 0; y < ALT; y++) {
-    for (let x = 0; x < LARG; x++) {
-      const c = g[y] && g[y][x];
-      if (!c) { arte += "0"; continue; }
-      if (!idx.has(c)) {
-        if (paleta.length >= PALETA_MAX) { arte += "0"; continue; }
-        paleta.push(c);
-        idx.set(c, paleta.length);
-      }
-      arte += idx.get(c).toString(16);
-    }
-  }
-  return { arte, paleta };
-}
-
-/* ------------------------------------------------------------- desenho */
-
-export function desenhar(ctx, av, { px = 4, andando = false, virado = false } = {}) {
-  const a = normalizar(av);
-  const g = grade(a, andando);
-
-  ctx.clearRect(0, 0, LARG * px, ALT_CANVAS * px);
   ctx.save();
-  if (virado) { ctx.translate(LARG * px, 0); ctx.scale(-1, 1); }
+  if (virado) { ctx.translate(L, 0); ctx.scale(-1, 1); }
 
-  // No modo desenho não dá pra mexer as pernas (não sei onde elas estão,
-  // ou se existem). Um pulinho de 1 pixel lê como andar do mesmo jeito.
-  const salto = (a.modo === "desenho" && andando) ? -px : 0;
+  // Quem desenha uma vez só precisa saber se ficou faltando camada, senão
+  // marca como pronto e o boneco fica incompleto pra sempre.
+  let completo = true;
 
-  // O sprite começa MARGEM_TOPO abaixo do topo do canvas, e é essa folga
-  // que o salto ocupa. Sem ela, a cabeça era cortada ao andar.
-  const base = MARGEM_TOPO * px;
-
-  for (let y = 0; y < ALT; y++) {
-    for (let x = 0; x < LARG; x++) {
-      const c = g[y][x];
-      if (!c) continue;
-      ctx.fillStyle = c;
-      ctx.fillRect(x * px, base + y * px + salto, px, px);
-    }
+  for (const nome of CAMADAS) {
+    const arquivo = arquivoDe(nome, av);
+    if (!arquivo) continue;
+    const cv = camada(arquivo, corDe(nome, av));
+    if (!cv) { completo = false; continue; }   // ainda carregando
+    ctx.drawImage(cv, 0, MARGEM_TOPO * esc + salto, L, ALT * esc);
   }
+
   ctx.restore();
+  return completo;
 }
 
-/** Canvas já no tamanho certo (com a folga do topo) e desenhado. */
-export function canvasAvatar(av, px = 4) {
+/** Canvas já dimensionado e desenhado. */
+export function canvasAvatar(avatar, esc = 2) {
   const cv = document.createElement("canvas");
-  cv.width = LARG * px;
-  cv.height = ALT_CANVAS * px;
+  cv.width = LARG * esc;
+  cv.height = ALT_CANVAS * esc;
   cv.style.imageRendering = "pixelated";
-  desenhar(cv.getContext("2d"), av, { px });
+  desenhar(cv.getContext("2d"), avatar, { esc });
   return cv;
 }

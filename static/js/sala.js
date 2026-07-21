@@ -6,14 +6,15 @@
  * serve pra contar aos outros onde eu estou, não pra me dizer onde eu estou.
  */
 
-import { desenhar, LARG, ALT_CANVAS, normalizar } from "./avatar.js";
+import { desenhar, LARG, ALT_CANVAS, normalizar, definirManifesto } from "./avatar.js";
+import { preaquecer } from "./sprites.js";
 import { api } from "./api.js";
 import { montarPainel } from "./editor.js";
 
 const $ = (s) => document.querySelector(s);
 const chao = $("#chao");
 
-const PX = 4;                    // tamanho do pixelão na sala
+const PX = 2;                    // escala do sprite na sala (32x48 vira 64x96)
 const VEL_X = 30;                // % da largura por segundo
 const VEL_Y = 20;                // o chão é raso, então anda mais devagar em profundidade
 const ENVIO_MS = 90;             // de quanto em quanto tempo aviso minha posição
@@ -31,6 +32,14 @@ try {
   location.href = "/entrar";
   throw new Error("sem sessão");
 }
+
+// O catálogo de peças vem do servidor (ele lê a pasta de sprites). Sem isso
+// o normalizar() não sabe quais peças são válidas e zeraria todo mundo.
+const manifesto = await api.pecas();
+definirManifesto(manifesto);
+// Carrega os sprites antes de a sala aparecer, senão dá pra ver o boneco
+// se montando peça por peça.
+await preaquecer(manifesto);
 
 const perfil = { nick: conta.nick, avatar: normalizar(conta.avatar) };
 
@@ -125,8 +134,11 @@ function laco(agora) {
     }
 
     if (p.sujo) {
-      desenhar(p.ctx, p.avatar, { px: PX, andando: p.quadro === 1, virado: p.virado });
-      p.sujo = false;
+      // Só considera pronto se todas as camadas entraram. Se alguma ainda
+      // estava carregando, tenta de novo no próximo quadro.
+      const completo = desenhar(p.ctx, p.avatar,
+        { esc: PX, andando: p.quadro === 1, virado: p.virado });
+      p.sujo = !completo;
     }
 
     if (p.balao && p.balaoAte && agora > p.balaoAte) {
@@ -320,7 +332,7 @@ function avisarMudanca() {
 
 function abrirEditor() {
   if (!editorPronto) {
-    montarPainel($("#editor"), perfil, avisarMudanca, { px: 7, comNick: true });
+    montarPainel($("#editor"), perfil, avisarMudanca, { esc: 2, comNick: true });
     editorPronto = true;
   }
   painel.hidden = false;
@@ -340,8 +352,8 @@ function pintarLista() {
   for (const p of gente.values()) {
     const div = document.createElement("div");
     const cv = document.createElement("canvas");
-    cv.width = LARG * 2; cv.height = ALT_CANVAS * 2;
-    desenhar(cv.getContext("2d"), p.avatar, { px: 2 });
+    cv.width = LARG; cv.height = ALT_CANVAS;
+    desenhar(cv.getContext("2d"), p.avatar, { esc: 1, sombra: false });
     const nome = document.createElement("span");
     nome.textContent = p.nick + (p.uid === meuUid ? " (você)" : "");
     if (p.uid === meuUid) nome.style.fontWeight = "bold";

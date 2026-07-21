@@ -46,12 +46,20 @@ Etapa 1 concluída e testada. Repositório público em
 - Sala em tempo real por WebSocket; entra pelo nome
 - Bonequinho anda (setas, WASD, clique no chão) com ordenação de profundidade
 - Chat com balão de fala sobre a cabeça
-- Editor de avatar em 3 abas: peças com cores livres, pixel a pixel,
+- Editor de avatar em 2 abas: peças (5 camadas, cores livres) e
   guarda-roupa de até 12 looks
 - Ferramentas de exportar, reimportar e validar sprites
 - Configuração de deploy pro Fly.io pronta (não deployado ainda)
 
+- Sprites de 32x48 em 5 camadas, com recoloração que preserva o sombreado,
+  pulo com sombra, e catálogo de peças lido da pasta `static/sprites/`
+
 **Não funciona ainda:** YouTube, compartilhamento de tela, histórico da sala.
+
+**A arte atual é provisória.** `ferramentas/gerar_placeholders.py` gera
+camadas de andaime pra o sistema ficar testável. Quando os sprites de
+verdade chegarem, é sobrescrever os arquivos em `static/sprites/` e apagar
+esse script — nenhum código muda.
 
 ### ⚠ A pergunta que ainda não foi respondida
 
@@ -175,17 +183,19 @@ Trocar os bonecos de 8×14 desenhados por código por sprites de verdade.
 
 ### Tarefas
 
-- [ ] Receber as 5 camadas em `static/sprites/` e validar com
+- [x] `avatar.js` compondo camadas de imagem em vez de gerar pixels
+- [x] Recoloração por matiz preservando a claridade (o sombreado sobrevive);
+      pixel abaixo de 16% de claridade não é recolorido, pra o contorno
+      continuar preto
+- [x] Sombra elíptica que encolhe no pulo
+- [x] Catálogo de peças lido da pasta e servido em `/api/pecas` — acrescentar
+      roupa é soltar o arquivo e reiniciar, sem tocar em código
+- [x] Escala ajustada na sala (2x), no editor (3x) e nas listas (1x)
+- [x] Camadas provisórias pra o sistema ficar testável
+- [ ] **Receber as 5 camadas de verdade** e validar com
       `ferramentas/conferir_sprites.py`
-- [ ] Reescrever `avatar.js` pra compor camadas de imagem em vez de gerar
-      pixels por código
-- [ ] Recoloração por remapeamento de tons (cada camada desenhada em 2-3
-      tons de uma cor só; trocar a cor preserva a sombra)
-- [ ] Sombra elíptica que encolhe no pulo
-- [ ] Direção: frente, costas e lado (o lado é espelhado, não precisa de arte
-      pros dois lados)
-- [ ] Ajustar escala na sala, no editor, na lista lateral e no guarda-roupa
-- [ ] Decidir o destino do editor pixel a pixel (ver "Pendências")
+- [ ] Direção: frente, costas e lado (hoje só existe uma vista, espelhada)
+- [ ] Reintroduzir o editor de retoque (ver "Pendências")
 
 ### ⚠ Migração
 
@@ -255,9 +265,14 @@ exatamente o comportamento que o projeto quer.
       no ___").
 - [ ] **`fly deploy` ainda não foi rodado.** Config pronta.
 - [ ] **Screenshots no README.** Faltam; o README de portfólio ganharia muito.
-- [ ] **O editor pixel a pixel sobrevive à arte nova?** A 32×48 são 1.536
-      pixels — desenhar o próprio boneco vira projeto, não brincadeira. Ou
-      ele é removido, ou vira recurso pra poucos. **Decidir com o usuário.**
+- [ ] **Reintroduzir o editor de pixel como retoque.** Decidido: ele não é
+      pra desenhar do zero (a 32×48 são 1.536 pixels, ninguém faria), e sim
+      pra **editar por cima de uma peça pronta** — mudar uma cor, acrescentar
+      um detalhe. Foi retirado na troca de arte porque o editor antigo
+      trabalhava em cima do sprite gerado por código, que deixou de existir.
+      O novo precisa abrir uma peça do catálogo e salvar a versão editada
+      como peça própria do usuário. Amadurecer o formato depois que a arte
+      de verdade chegar.
 - [ ] **Moderação.** O editor livre permite desenhar qualquer coisa. Entre
       amigos é problema teórico; numa sala aberta vira problema no primeiro
       dia. Precisa de resposta antes de qualquer abertura ao público.
