@@ -66,7 +66,8 @@ saída dela. Lobby e lista de salas prontos. **No ar em
 - Móveis na sala: uma TV de tubo (com o vídeo rodando dentro da tela dela,
   e tela verde quando não tem nada) e um sofá de 3 lugares, com a mesma
   regra de profundidade dos bonecos
-- Balão de "está digitando" com três pontinhos sobre a cabeça
+- "Está digitando": três pontinhos animados sobre a cabeça do boneco **e**
+  a linha "fulano está digitando..." embaixo do chat
 - Buzina que toca um som e pisca o título pra chamar quem está com a aba
   escondida — **temporária**, ver a nota nas pendências
 - Barra de digitar atravessando o rodapé, conversa ocupando a coluna
@@ -174,6 +175,9 @@ Não reabrir sem motivo novo.
 | **Mudo usa `mute()`, não volume 0** | Em 0 o YouTube ainda deixa passar um fiapo de som em alguns navegadores. Além disso `mute()` preserva o nível anterior, então voltar do mudo devolve o volume que a pessoa tinha escolhido em vez de chutar 100. |
 | **O endereço do código carrega a versão** | `/v/<hash>/js/sala.js`, com o hash tirado do conteúdo dos `.js` e `.css`. Mudou o código, muda o endereço — e não existe cópia velha daquele endereço pra o navegador reusar. O arquivo então pode ir com `immutable` e cache eterno, sem risco. **Só o `no-cache` não bastava**: ele vale das respostas dali pra frente, e quem já tinha cópia guardada continuava com ela até vencer. O detalhe que faz a solução ser barata: os `import` dos nossos `.js` são **relativos**, então versionar o ponto de entrada versiona a árvore toda sozinho, sem tocar em nenhum import. |
 | **As páginas HTML vão com `no-cache`** | Elas são o mapa que aponta pros endereços versionados; mapa velho levaria de volta ao código velho. Isso estava faltando: as páginas são servidas por `FileResponse` direto nas rotas e **não passavam pelo `StaticFiles`**, então a correção de cache anterior não as alcançava. |
+| **Quem digita não vê o próprio aviso** | O servidor manda o `digitando` com `exceto=uid`. É o comportamento certo (ninguém precisa ser avisado de que está digitando), mas **engana na hora de testar**: sozinho numa sala não aparece nada, e a conclusão natural é que está quebrado. Já aconteceu. Pra testar sem outra pessoa, **abrir a sala em duas abas** — cada conexão ganha um `uid` próprio, então a mesma conta vira dois bonecos e uma aba enxerga a outra. |
+| **A linha "fulano está digitando" fica fora do histórico** | Como o aviso é reenviado a cada 2s enquanto a pessoa escreve, virar mensagem de chat encheria o log de linhas repetidas. É **estado, não acontecimento**: tem lugar fixo embaixo do histórico e some quando acaba. A altura fica reservada mesmo vazia, senão o chat pula toda vez que alguém começa a digitar. |
+| **A linha e o balão saem do mesmo estado** | Os dois são derivados do `pensandoAte` de cada pessoa, em vez de a linha ter contagem própria. Duas fontes de verdade pra mesma coisa acabam discordando — o balão sumindo e a linha ficando pendurada, ou o contrário. |
 | **"Está digitando" não carrega texto** | Só um liga/desliga. Mandar o que a pessoa escreve antes de ela apertar enter vazaria rascunho — inclusive o que ela escreveu, pensou melhor e apagou. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 

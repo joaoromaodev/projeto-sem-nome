@@ -40,8 +40,8 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
 - **O vídeo toca dentro da TV da sala** — a televisão é um móvel no chão,
   com os bonecos andando na frente dela; quando não tem nada tocando, ela
   mostra a tela verde de TV desligada
-- **Balão de "está digitando"** — três pontinhos sobre a cabeça de quem
-  está escrevendo
+- **"Está digitando"** — três pontinhos animados sobre a cabeça do boneco,
+  e a linha "fulano está digitando..." embaixo da conversa
 - **Volume de cada um** — o único ajuste do vídeo que não passa pelo
   servidor nem exige o controle remoto, e que o navegador lembra
 - **Controle remoto** — fica no chão da sala; quem pega manda no play,

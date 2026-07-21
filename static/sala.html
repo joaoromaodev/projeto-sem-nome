@@ -146,6 +146,15 @@
 
   #pegarControle { padding: 3px 8px; font-size: 11px; white-space: nowrap; }
 
+  /* Altura reservada mesmo vazia: sem isso o histórico do chat pula pra
+     cima e pra baixo toda vez que alguém começa ou para de digitar. */
+  #quemDigita {
+    flex: none; min-height: 15px; padding: 2px 8px 4px;
+    font-size: 11px; font-style: italic;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    border-top: 1px solid #e0e0e8; background: #fff;
+  }
+
   /* ---- barra de baixo ----
      Duas fileiras: em cima a conversa, que é o que mais se usa; embaixo o
      vídeo. Numa fileira só, o campo de digitar disputaria espaço com sete
@@ -279,6 +288,11 @@
       <div class="tbar"><span class="t">■ conversa</span></div>
       <div class="corpo semfolga">
         <div id="chatlog"></div>
+        <!-- Linha de "fulano está digitando". Fica FORA do histórico de
+             propósito: como o aviso é reenviado a cada 2s, virar mensagem
+             encheria o chat de linhas repetidas. É um estado, não um
+             acontecimento — então tem lugar fixo e some quando acaba. -->
+        <div id="quemDigita" class="dim"></div>
       </div>
     </div>
   </div>

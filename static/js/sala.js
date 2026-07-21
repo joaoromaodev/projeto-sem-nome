@@ -103,6 +103,8 @@ function tirarPessoa(uid) {
   if (!p) return;
   p.el.remove();
   gente.delete(uid);
+  // quem saiu no meio de uma frase não pode continuar "digitando..."
+  pintarQuemDigita();
 }
 
 function posicionar(p) {
@@ -127,11 +129,31 @@ function falar(p, texto) {
   mostrarDigitando(p, false);
 }
 
+/* A linha "fulano está digitando..." embaixo do chat.
+
+   Sai do MESMO estado que controla os balões (`pensandoAte` de cada
+   pessoa) em vez de ter contagem própria. Duas fontes de verdade pra
+   mesma coisa acabam discordando — o balão sumindo e a linha ficando, ou
+   o contrário. Aqui, se o balão apareceu, a linha aparece junto. */
+function pintarQuemDigita() {
+  const nomes = [...gente.values()]
+    .filter((p) => p.pensandoAte && p.uid !== meuUid)
+    .map((p) => p.nick);
+
+  let txt = "";
+  if (nomes.length === 1) txt = `${nomes[0]} está digitando...`;
+  else if (nomes.length === 2) txt = `${nomes[0]} e ${nomes[1]} estão digitando...`;
+  else if (nomes.length > 2) txt = `${nomes.length} pessoas estão digitando...`;
+
+  $("#quemDigita").textContent = txt;
+}
+
 /** Os três pontinhos sobre a cabeça de quem está escrevendo. */
 function mostrarDigitando(p, ligado) {
   if (!ligado) {
     if (p.pensando) p.pensando.style.display = "none";
     p.pensandoAte = 0;
+    pintarQuemDigita();
     return;
   }
   if (!p.pensando) {
@@ -148,6 +170,7 @@ function mostrarDigitando(p, ligado) {
   // Prazo de validade: se a pessoa fechar a aba no meio da frase, o aviso
   // de "parei" nunca chega e o balão ficaria pendurado pra sempre.
   p.pensandoAte = performance.now() + DIGITANDO_SOME_MS;
+  pintarQuemDigita();
 }
 
 /* ------------------------------------------------------------ desenho */
@@ -185,6 +208,7 @@ function laco(agora) {
     if (p.pensando && p.pensandoAte && agora > p.pensandoAte) {
       p.pensando.style.display = "none";
       p.pensandoAte = 0;
+      pintarQuemDigita();
     }
   }
 
