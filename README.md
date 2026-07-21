@@ -254,3 +254,6 @@ terceiros — estão em **[docs/ARTE.md](docs/ARTE.md)**.
 - A lista de salas mostra o apelido de todo mundo que está online pra
   qualquer pessoa logada — entre amigos é o objetivo, numa sala aberta ao
   público é outra conversa
+- O editor de boneco não cabe na tela: dentro da sala ele passa da altura
+  do chão sem rolagem, e na home domina a página. Vai ser reestruturado
+  junto com a arte definitiva — ver `docs/PLANO.md`

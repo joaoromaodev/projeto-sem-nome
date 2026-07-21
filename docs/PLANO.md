@@ -355,6 +355,28 @@ exatamente o comportamento que o projeto quer.
       ("a gente se encontra no ___").
 - [ ] **Moderação do lobby.** O lobby é onde estranhos se encontram — é ele
       que transforma moderação de problema teórico em problema de dia um.
+- [ ] **O editor de boneco não cabe na tela — nos dois lugares.** Achado
+      testando no navegador, em 2026-07-21.
+
+      Dentro da sala, o `#painel` flutuante (`sala.html`) tem largura fixa
+      de 200px e **nenhum teto de altura nem rolagem**: as cinco camadas
+      empilhadas passam da altura do chão e o fim do editor fica
+      inalcançável. Na home (`index.html`), a coluna do editor estica até
+      encostar no topo e domina a página.
+
+      A causa é a mesma nos dois: o editor cresce linearmente com o número
+      de camadas × (seletor de peça + paleta de cores), e hoje são 5
+      camadas com paletas de até 10 cores. **Acrescentar peça piora.**
+
+      **Decidido esperar a arte definitiva antes de mexer.** O layout certo
+      depende de quantas peças e cores vão existir de verdade, e do
+      tamanho final do preview — remendar agora seria refazer depois. Vale
+      resolver junto com o editor de retoque, que é o item abaixo.
+
+      Caminhos, pra não redescobrir: abas por camada em vez de tudo
+      empilhado; paleta em popover em vez de grade sempre aberta; ou o
+      painel da sala com `max-height` e rolagem, que é o remendo mínimo se
+      a arte demorar.
 - [ ] **Screenshots no README.** Faltam; o README de portfólio ganharia muito.
 - [ ] **Reintroduzir o editor de pixel como retoque.** Decidido: ele não é
       pra desenhar do zero (a 32×48 são 1.536 pixels, ninguém faria), e sim
