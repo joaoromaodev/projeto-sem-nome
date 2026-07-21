@@ -46,13 +46,12 @@ Etapa 1 concluída e testada. Repositório público em
 - Sala em tempo real por WebSocket; entra pelo nome
 - Bonequinho anda (setas, WASD, clique no chão) com ordenação de profundidade
 - Chat com balão de fala sobre a cabeça
+- Sprites de 32×48 em 5 camadas, com recoloração que preserva o sombreado,
+  pulo com sombra, e catálogo de peças lido da pasta `static/sprites/`
 - Editor de avatar em 2 abas: peças (5 camadas, cores livres) e
   guarda-roupa de até 12 looks
-- Ferramentas de exportar, reimportar e validar sprites
+- Ferramentas de gerar camadas provisórias e validar sprites
 - Configuração de deploy pro Fly.io pronta (não deployado ainda)
-
-- Sprites de 32x48 em 5 camadas, com recoloração que preserva o sombreado,
-  pulo com sombra, e catálogo de peças lido da pasta `static/sprites/`
 
 **Não funciona ainda:** YouTube, compartilhamento de tela, histórico da sala.
 
@@ -60,6 +59,39 @@ Etapa 1 concluída e testada. Repositório público em
 camadas de andaime pra o sistema ficar testável. Quando os sprites de
 verdade chegarem, é sobrescrever os arquivos em `static/sprites/` e apagar
 esse script — nenhum código muda.
+
+### Próximo passo concreto
+
+Em ordem, quando esta sessão for retomada:
+
+1. **Rodar `fly deploy`** (config pronta, nunca executada) e marcar uma noite
+   com a galera. Ver "A pergunta que ainda não foi respondida" logo abaixo.
+2. **Receber as 5 camadas de arte** e validar com
+   `python ferramentas/conferir_sprites.py`. O usuário estava produzindo a
+   partir de uma base de 27×46 que ia expandir pra 32×48.
+3. **Etapa 2 — YouTube sincronizado.** É a maior fatia de trabalho restante.
+
+### O que foi verificado, e o que não foi
+
+Registrado pra ninguém reverificar à toa nem confiar demais:
+
+**Verificado rodando:** contas (cadastro, apelido duplicado, senha curta,
+login case-insensitive, senha errada, temporização igual pra usuário
+inexistente); WebSocket recusado sem sessão; chat, movimento e troca de
+avatar chegando nos outros clientes; guarda-roupa incluindo isolamento entre
+contas (um usuário não apaga look de outro nem chutando o id); avatar
+sobrevivendo ao banco; travessia de caminho no nome de peça rejeitada;
+composição das 5 camadas com manga cobrindo ou não o braço; recoloração
+mudando os pixels e preservando o contorno; pulo sem cortar a cabeça;
+cookie `secure` ligando só em HTTPS.
+
+**NÃO verificado visualmente:** a sala com os bonecos novos em movimento. O
+painel de preview mantinha a aba com `visibilityState: "hidden"`, e o
+`requestAnimationFrame` não dispara em aba oculta — o laço nunca rodou ali.
+O caminho de desenho foi conferido chamando `desenhar()` na mão, no mesmo
+canvas da sala, com o avatar real da conta: as 5 camadas entram completas nas
+três variações (parado, andando, virado). Ainda assim, **abrir num navegador
+de verdade e confirmar é a primeira coisa a fazer.**
 
 ### ⚠ A pergunta que ainda não foi respondida
 
@@ -276,6 +308,69 @@ exatamente o comportamento que o projeto quer.
 - [ ] **Moderação.** O editor livre permite desenhar qualquer coisa. Entre
       amigos é problema teórico; numa sala aberta vira problema no primeiro
       dia. Precisa de resposta antes de qualquer abertura ao público.
+
+---
+
+## O que já foi feito
+
+Ordem cronológica, com o commit correspondente. Serve pra saber o que **não**
+precisa ser refeito.
+
+### Etapa 1 — sala, chat e contas · `440594e`
+
+- [x] Servidor FastAPI com WebSocket; mensagens validadas por Pydantic
+- [x] Sala em memória, criada na hora que alguém entra; código vem do nome
+- [x] Chat com balão sobre a cabeça e histórico lateral
+- [x] Movimento previsto no cliente, com interpolação e ordenação por
+      profundidade
+- [x] Reconexão automática com espera crescente
+- [x] Contas com senha por scrypt, sessão por cookie httponly
+- [x] Identidade do WebSocket vinda do cookie (a mensagem de "join" com nome
+      foi eliminada)
+- [x] Limite de tentativas de login por IP; resposta e tempo iguais pra
+      usuário inexistente
+- [x] Trocar apelido e senha; trocar senha derruba as outras sessões
+- [x] Guarda-roupa de até 12 looks, isolado por conta
+- [x] Estética Win98 em CSS puro
+- [x] Deploy pro Fly.io configurado: Dockerfile, `fly.toml` com volume,
+      `PORT` e `DB_PATH` por variável de ambiente, cookie `secure` conforme
+      o protocolo
+- [x] Repositório público com README de portfólio
+
+### Documentação · `5694400`
+
+- [x] Este plano, com as decisões e seus motivos
+
+### Etapa 3 (parcial) — sprites em camadas · `ae44828`
+
+- [x] `sprites.js`: carregamento, recoloração por matiz preservando a
+      claridade, e cache
+- [x] `avatar.js` reescrito pra compor 5 camadas de imagem
+- [x] Pulo com sombra que encolhe
+- [x] `/api/pecas` monta o catálogo lendo a pasta de sprites
+- [x] Modelo do avatar no Pydantic trocado pra peça + cor por camada, com
+      nome de peça validado (barra travessia de caminho)
+- [x] Editor adaptado: peças e cores das 5 camadas
+- [x] Escalas ajustadas: sala 2×, editor 3×, listas 1×
+- [x] `gerar_placeholders.py` — camadas de andaime pra testar sem a arte final
+- [x] `conferir_sprites.py` — valida tamanho, transparência, suavização,
+      encaixe perna/sapato e número de cores
+- [x] Removidos o editor pixel a pixel e o template de 8×14, que dependiam do
+      sprite gerado por código
+
+### Bugs achados e corrigidos
+
+Todos apareceram rodando, nenhum aparecia lendo o código:
+
+- Balão de fala saía uma letra por linha (`max-width` não resolve contra um
+  pai de 32px; precisa de `width: max-content`)
+- Painel do boneco abria sozinho e vazio (`display:flex` do `.win` ganhava do
+  atributo `hidden`)
+- Cabeça cortada ao andar (o canvas não tinha folga no topo pro pulo)
+- Primeiro desenho de cada boneco saía vazio (a função de camada só devolvia
+  resultado assíncrono; quem desenha uma vez ficava com o boneco invisível)
+- `setPointerCapture` antes do primeiro traço no editor de pixel
+- Coluna do guarda-roupa estourando o painel (`white-space: nowrap` no botão)
 
 ---
 
