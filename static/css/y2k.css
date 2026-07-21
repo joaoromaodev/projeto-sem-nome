@@ -138,7 +138,8 @@ label { user-select: none; }
 .balao {
   position: absolute; bottom: 100%; left: 50%;
   transform: translateX(-50%);
-  margin-bottom: 3px;
+  /* 7px = a altura da setinha (6px) + 1px de folga sobre a cabeça */
+  margin-bottom: 7px;
   background: #fff; border: 1px solid #000;
   padding: 3px 6px; font-size: 11px;
   /* .pessoa tem a largura do boneco (~32px). Sem o max-content o balão
@@ -146,8 +147,25 @@ label { user-select: none; }
   width: max-content;
   max-width: 190px;
   white-space: normal; word-break: break-word;
+  /* .pessoa centraliza (por causa do nome sob o boneco). Num balão de
+     várias linhas isso deixa a última linha boiando no meio. */
+  text-align: left;
   line-height: 1.3;
 }
+
+/* Setinha apontando pra cabeça de quem falou. São dois triângulos: o de
+   baixo faz o contorno preto, o de cima tapa com branco 1px acima, de
+   modo que a borda do balão pareça contornar a ponta também. */
+.balao::before,
+.balao::after {
+  content: ""; position: absolute;
+  left: 50%; margin-left: -5px;
+  border: 5px solid transparent;
+  border-bottom: 0;
+  width: 0; height: 0;
+}
+.balao::before { bottom: -6px; border-top-color: #000; }
+.balao::after  { bottom: -5px; border-top-color: #fff; }
 
 /* ---------------------------------------------------- chat */
 

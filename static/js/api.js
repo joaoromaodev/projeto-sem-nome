@@ -36,6 +36,9 @@ export const api = {
   // catálogo de peças; o servidor monta lendo a pasta static/sprites/
   pecas: () => pedir("GET", "/api/pecas"),
 
+  // salas com gente agora, o lobby na frente
+  salas: () => pedir("GET", "/api/salas"),
+
   verGuardaRoupa: () => pedir("GET", "/api/guarda-roupa"),
   guardarLook: (nome, avatar) => pedir("POST", "/api/guarda-roupa", { nome, avatar }),
   apagarLook: (id) => pedir("DELETE", `/api/guarda-roupa/${id}`),

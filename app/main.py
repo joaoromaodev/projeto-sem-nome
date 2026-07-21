@@ -17,7 +17,7 @@ from starlette.websockets import WebSocketDisconnect
 from . import db
 from .protocol import (Avatar, AvatarIn, ChatIn, MoveIn, NickIn, PingIn, Pos,
                        ev, limpar_nick, parse)
-from .rooms import User, manager
+from .rooms import LOBBY, User, manager
 
 RAIZ = Path(__file__).resolve().parent.parent
 ESTATICO = RAIZ / "static"
@@ -213,6 +213,15 @@ async def por_senha(body: SenhaBody, response: Response, u: dict = Depends(usuar
 @app.get("/api/stats")
 async def stats():
     return manager.stats()
+
+
+@app.get("/api/salas")
+async def salas(u: dict = Depends(usuario)):
+    """Salas com gente agora. Exige sessão: a lista diz quem está onde.
+
+    Deliberadamente não tem nota nem ranking — ver `Room.resumo()`.
+    """
+    return {"salas": manager.listar(), "lobby": LOBBY}
 
 
 # ------------------------------------------------------------- peças

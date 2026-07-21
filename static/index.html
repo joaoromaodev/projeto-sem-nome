@@ -26,6 +26,33 @@
   .topo { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
   .topo .quem { flex: 1; font-size: 12px; }
   .topo button { padding: 3px 10px; font-size: 11px; }
+
+  /* ---- lista de salas ---- */
+  #salas { max-height: 196px; overflow-y: auto; }
+  .sala {
+    display: flex; align-items: center; gap: 7px;
+    padding: 4px 5px; cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .sala:hover { background: #000080; color: #fff; }
+  .sala:hover .dim { color: #c8c8e0; }
+  .sala.lobby { border-color: var(--sombra); background: #eceCf4; }
+  .sala.lobby:hover { background: #000080; }
+  .sala .nomes { flex: 1; min-width: 0; }
+  .sala .cod { font-weight: bold; font-size: 12px; }
+  .sala .quem2 {
+    font-size: 10px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .sala .conta2 { font-size: 11px; flex: none; }
+  /* Os bonequinhos da amostra ficam sobrepostos pra caber mais de um.
+     A altura tem que acompanhar o canvas do sprite (ALT_CANVAS = 51: são
+     os 48 do boneco mais a folga do pulo). Menos que isso e o boneco vaza
+     pra fora da linha, por cima da legenda — já aconteceu. */
+  .caras { display: flex; flex: none; height: 51px; align-items: flex-end; }
+  .caras canvas { image-rendering: pixelated; margin-right: -10px; }
+  .caras canvas:last-child { margin-right: 0; }
+  .vazio { font-size: 11px; padding: 6px 4px; }
 </style>
 </head>
 <body>
@@ -49,12 +76,17 @@
       </fieldset>
 
       <div>
-        <div class="campo">
-          <label for="sala">Nome da sala</label>
+        <fieldset>
+          <legend>Onde tem gente agora</legend>
+          <div id="salas"><p class="dim vazio">carregando...</p></div>
+        </fieldset>
+
+        <div class="campo" style="margin-top:14px;">
+          <label for="sala">Ou entre por nome</label>
           <input type="text" id="sala" maxlength="32" placeholder="ex: quinta a noite" autocomplete="off">
           <p class="dim aviso">
             Quem digitar o mesmo nome cai na mesma sala.<br>
-            Combine um nome com a galera e usem sempre ele.
+            Sala que não existe é criada na hora.
           </p>
         </div>
 
@@ -83,7 +115,7 @@
 <script type="module">
 import { api, adiar } from "/js/api.js";
 import { montarPainel } from "/js/editor.js";
-import { normalizar, definirManifesto } from "/js/avatar.js";
+import { normalizar, definirManifesto, canvasAvatar } from "/js/avatar.js";
 import { preaquecer } from "/js/sprites.js";
 
 const $ = (s) => document.querySelector(s);
@@ -122,15 +154,70 @@ const painel = montarPainel($("#editor"), perfil, gravar, { esc: 3, comNick: tru
 /* ---------- sala ---------- */
 $("#sala").value = localStorage.getItem("psn.ultimaSala") || "";
 
+function irPara(code) {
+  localStorage.setItem("psn.ultimaSala", code);
+  location.href = "/sala/" + encodeURIComponent(code);
+}
+
 function irParaSala() {
   const sala = $("#sala").value.trim();
   if (!sala) { $("#sala").focus(); return recado($("#recado"), "falta o nome da sala"); }
-  localStorage.setItem("psn.ultimaSala", sala);
-  location.href = "/sala/" + encodeURIComponent(sala);
+  irPara(sala);
 }
 
 $("#entrar").onclick = irParaSala;
 $("#sala").addEventListener("keydown", (e) => { if (e.key === "Enter") irParaSala(); });
+
+/* ---------- lista de salas ----------
+   Sinal de vida, não nota: mostra quanta gente tem e quem são. A decisão
+   que a pessoa toma olhando isso é "vale entrar?", e pra isso presença
+   informa melhor que estrela — e não cria sala "mal avaliada". */
+
+function cartao(s) {
+  const el = document.createElement("div");
+  el.className = "sala" + (s.lobby ? " lobby" : "");
+  el.title = `entrar em "${s.code}"`;
+
+  const caras = document.createElement("div");
+  caras.className = "caras";
+  for (const av of s.avatares) caras.appendChild(canvasAvatar(av, 1));
+
+  const nomes = document.createElement("div");
+  nomes.className = "nomes";
+  const cod = document.createElement("div");
+  cod.className = "cod";
+  cod.textContent = s.lobby ? "lobby" : s.code;
+  const quem = document.createElement("div");
+  quem.className = "quem2 dim";
+  quem.textContent = s.gente
+    ? s.nicks.join(", ") + (s.gente > s.nicks.length ? ` +${s.gente - s.nicks.length}` : "")
+    : (s.lobby ? "ninguém ainda — seja o primeiro" : "vazia");
+  nomes.append(cod, quem);
+
+  const conta2 = document.createElement("div");
+  conta2.className = "conta2 dim";
+  conta2.textContent = `${s.gente}/${s.limite}`;
+
+  el.append(caras, nomes, conta2);
+  el.onclick = () => irPara(s.code);
+  return el;
+}
+
+async function carregarSalas() {
+  let dados;
+  try { dados = await api.salas(); } catch { return; }
+
+  const alvo = $("#salas");
+  alvo.textContent = "";
+  for (const s of dados.salas) alvo.appendChild(cartao(s));
+}
+
+await carregarSalas();
+// A lista envelhece rápido (gente entra e sai). Recarrega enquanto a aba
+// está à vista; em aba oculta não adianta gastar requisição.
+setInterval(() => {
+  if (document.visibilityState === "visible") carregarSalas();
+}, 8000);
 
 /* ---------- conta ---------- */
 $("#sair").onclick = async () => {

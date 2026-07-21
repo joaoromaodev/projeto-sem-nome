@@ -18,6 +18,17 @@ from .protocol import Avatar, Pos, ev
 
 
 MAX_POR_SALA = 12
+
+# O lobby é a sala oficial: quem entra sem destino cai aqui, então nunca deve
+# estar vazia. Cabe mais gente que uma sala comum — 12 é medida de sala de
+# amigos, e o lobby é praça. Acima de ~30 bonecos a tela vira sopa.
+LOBBY = "lobby"
+MAX_LOBBY = 30
+
+# Quantos avatares a lista de salas manda por sala. É só pra dar cara à
+# sala na lista; mandar os 30 do lobby seria payload à toa.
+AMOSTRA = 6
+
 SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 
@@ -58,11 +69,37 @@ class Room:
         self._lock = asyncio.Lock()
 
     @property
+    def eh_lobby(self) -> bool:
+        return self.code == LOBBY
+
+    @property
+    def limite(self) -> int:
+        return MAX_LOBBY if self.eh_lobby else MAX_POR_SALA
+
+    @property
     def cheia(self) -> bool:
-        return len(self.users) >= MAX_POR_SALA
+        return len(self.users) >= self.limite
 
     def roster(self) -> list[dict]:
         return [u.publico() for u in self.users.values()]
+
+    def resumo(self) -> dict:
+        """O cartão da sala na lista do lobby.
+
+        Sinal de vida em vez de nota: quem olha a lista quer saber se tem
+        gente lá e quem é, não se a sala é "boa". Por isso vão os avatares
+        de verdade e não uma média de estrelas.
+        """
+        return {
+            "code": self.code,
+            "gente": len(self.users),
+            "limite": self.limite,
+            "lobby": self.eh_lobby,
+            "nicks": [u.nick for u in self.users.values()][:AMOSTRA],
+            "avatares": [
+                u.avatar.model_dump() for u in self.users.values()
+            ][:AMOSTRA],
+        }
 
     async def add(self, user: User) -> None:
         async with self._lock:
@@ -96,6 +133,7 @@ class Room:
 class RoomManager:
     def __init__(self):
         self.rooms: dict[str, Room] = {}
+        self.get(LOBBY)  # o lobby existe desde o boot, mesmo sem ninguém
 
     def get(self, code: str) -> Room:
         """Sala é criada na hora que alguém tenta entrar. Sem cadastro."""
@@ -107,12 +145,31 @@ class RoomManager:
     def existe(self, code: str) -> bool:
         return slugify(code) in self.rooms
 
+    def listar(self) -> list[dict]:
+        """Salas com gente agora, o lobby sempre na frente.
+
+        Só entra sala com alguém dentro: sala vazia na lista é convite pra
+        entrar num lugar deserto e sair. O lobby é a exceção — ele aparece
+        mesmo vazio, porque é o destino padrão e precisa de porta visível.
+        """
+        vivas = [
+            r.resumo() for r in self.rooms.values()
+            if r.users or r.eh_lobby
+        ]
+        # lobby primeiro; depois as mais cheias
+        vivas.sort(key=lambda s: (not s["lobby"], -s["gente"], s["code"]))
+        return vivas
+
     def limpar_vazias(self) -> int:
-        """Sala sem ninguém há mais de 1h vira lixo. Roda pelo housekeeping."""
+        """Sala sem ninguém há mais de 1h vira lixo. Roda pelo housekeeping.
+
+        O lobby nunca entra na faxina: ele é o destino padrão, e recriá-lo
+        no próximo acesso perderia o contador da sala.
+        """
         agora = time.time()
         mortas = [
             c for c, r in self.rooms.items()
-            if not r.users and agora - r.criada_em > 3600
+            if not r.users and not r.eh_lobby and agora - r.criada_em > 3600
         ]
         for c in mortas:
             del self.rooms[c]

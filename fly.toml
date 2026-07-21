@@ -1,9 +1,11 @@
 # Configuração do Fly.io.
 #
-# Trocar "projeto-sem-nome" pelo nome que você registrar (tem que ser único
-# no Fly inteiro). O `fly launch` faz isso sozinho na primeira vez.
+# O nome do app é único no Fly inteiro e vira a URL: 2gether.fly.dev.
+# Registrado com `flyctl apps create` de propósito, e não com `fly launch`:
+# o launch reescreve este arquivo e derrubaria os comentários e os ajustes
+# de volume, região e concorrência que estão abaixo.
 
-app = "projeto-sem-nome"
+app = "2gether"
 primary_region = "gru"   # São Paulo — menos latência pra galera daqui
 
 [build]

@@ -37,13 +37,19 @@ dessa reação que os avatares saíram da Etapa 3 e viraram Etapa 1.
 
 ## Onde estamos
 
-Etapa 1 concluída e testada. Repositório público em
+Etapa 1 concluída e testada. Lobby e lista de salas prontos. **No ar em
+<https://2gether.fly.dev>.** Repositório público em
 `github.com/joaoromaodev/projeto-sem-nome`.
 
 **Funciona:**
 
 - Conta com apelido e senha (scrypt), sessão por cookie httponly
 - Sala em tempo real por WebSocket; entra pelo nome
+- Lobby: sala oficial de código `lobby`, criada no boot, nunca varrida pela
+  faxina de salas vazias, teto de 30 (sala comum é 12)
+- Lista de salas com gente agora (`/api/salas`): contagem, apelidos e
+  avatares renderizados; sala vazia não aparece, o lobby aparece mesmo vazio
+- Botões de ir pro lobby, trocar de sala e sair
 - Bonequinho anda (setas, WASD, clique no chão) com ordenação de profundidade
 - Chat com balão de fala sobre a cabeça
 - Sprites de 32×48 em 5 camadas, com recoloração que preserva o sombreado,
@@ -51,9 +57,10 @@ Etapa 1 concluída e testada. Repositório público em
 - Editor de avatar em 2 abas: peças (5 camadas, cores livres) e
   guarda-roupa de até 12 looks
 - Ferramentas de gerar camadas provisórias e validar sprites
-- Configuração de deploy pro Fly.io pronta (não deployado ainda)
+- Deploy no Fly.io rodando, com volume persistente verificado
 
-**Não funciona ainda:** YouTube, compartilhamento de tela, histórico da sala.
+**Não funciona ainda:** YouTube, compartilhamento de tela, sala privada,
+histórico da sala.
 
 **A arte atual é provisória.** `ferramentas/gerar_placeholders.py` gera
 camadas de andaime pra o sistema ficar testável. Quando os sprites de
@@ -64,8 +71,9 @@ esse script — nenhum código muda.
 
 Em ordem, quando esta sessão for retomada:
 
-1. **Rodar `fly deploy`** (config pronta, nunca executada) e marcar uma noite
-   com a galera. Ver "A pergunta que ainda não foi respondida" logo abaixo.
+1. **Marcar a noite com a galera.** O deploy já está feito e o link é
+   <https://2gether.fly.dev>. Ver "A pergunta que ainda não foi respondida"
+   logo abaixo — continua sendo a tarefa mais importante da lista.
 2. **Receber as 5 camadas de arte** e validar com
    `python ferramentas/conferir_sprites.py`. O usuário estava produzindo a
    partir de uma base de 27×46 que ia expandir pra 32×48.
@@ -119,6 +127,9 @@ Não reabrir sem motivo novo.
 | **Uma máquina só no deploy** | O estado da sala vive em memória. Duas máquinas = dois usuários da mesma sala em servidores diferentes, sem se enxergar. |
 | **Fly.io, não o PC de casa** | O projeto vai pro portfólio. Link que só funciona com o PC ligado é inútil pra isso. CGNAT das operadoras também impediria abrir porta. |
 | **Vercel está descartado** | Serverless não segura conexão WebSocket aberta. |
+| **Sem rating de salas** | Foi proposto e recusado. Entre poucos amigos uma nota é dois votos — ruído, não sinal. Ranking cria sala "mal avaliada", que entre amigos é constrangimento. E descoberta por nota é o modelo de lista de servidor público, exatamente o que a tese rejeita. A pergunta real de quem olha a lista não é "essa sala é boa?" e sim "tem gente lá? tem gente que eu conheço?" — por isso a lista mostra **presença**: contagem, apelidos e avatares. |
+| **`apps create`, não `fly launch`** | O `launch` reescreve o `fly.toml` e derrubaria os comentários e os ajustes de volume, região e concorrência. |
+| **Sala privada depende de persistência** | Sala privada precisa de dono, e dono precisa sobreviver ao restart. Hoje `Room` vive num dict em memória: reiniciou, evaporou o dono junto. Por isso o item foi empurrado pra depois da Etapa 5, e não improvisado agora. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 
 ---
@@ -275,13 +286,19 @@ propósito: é a parte mais frágil e a que menos gerou entusiasmo.
 
 ## Etapa 5 — A sala persistente
 
-O que fecha a tese. Hoje a sala some quando o servidor reinicia.
+O que fecha a tese. Hoje a sala some quando o servidor reinicia — e no Fly
+isso acontece toda vez que a máquina dorme por falta de gente.
 
 - [ ] Salas no banco (não só em memória)
+- [ ] **Sala privada por link de convite.** Decidido que é convite e não
+      lista de permissões: entre amigos, gerenciar permissão é burocracia
+      que ninguém usa. Depende deste item de persistência pra ter dono.
 - [ ] Histórico: o que já tocou ali
 - [ ] Contador visível ("342 músicas ouvidas aqui")
 - [ ] Favoritos do grupo
 - [ ] Membros: quem frequenta, com avatar apagadinho pra quem está offline
+- [ ] "Suas salas" no lobby — as que você frequenta, que é exatamente o
+      comportamento recorrente que a tese quer premiar
 - [ ] Decoração da sala
 
 Esse conjunto é o que faz alguém abrir o site sem motivo específico — que é
@@ -292,10 +309,18 @@ exatamente o comportamento que o projeto quer.
 ## Pendências e perguntas abertas
 
 - [ ] **Fazer o teste com os amigos.** É a tarefa mais importante da lista.
-- [ ] **O projeto não tem nome.** Já foi pedido ao grupo, sem retorno. Pedido
-      genérico não funciona; tentar completar frase ("a gente se encontra
-      no ___").
-- [ ] **`fly deploy` ainda não foi rodado.** Config pronta.
+      O link existe: <https://2gether.fly.dev>.
+- [ ] **O projeto ainda não tem nome.** O endereço público ficou `2gether`
+      porque `together` já estava tomado no Fly e era preciso escolher algo
+      pra deployar — **não é uma decisão de nome do projeto**. Fica
+      registrado o risco levantado na hora: `2gether` é quase o nome do
+      concorrente direto que o README usa como contraste (Watch2Gether), e
+      a leitura provável de quem recebe o link é "é tipo o Watch2Gether".
+      Se o grupo escolher um nome de verdade, trocar cedo custa menos.
+      Pedido genérico ao grupo já falhou uma vez; tentar completar frase
+      ("a gente se encontra no ___").
+- [ ] **Moderação do lobby.** O lobby é onde estranhos se encontram — é ele
+      que transforma moderação de problema teórico em problema de dia um.
 - [ ] **Screenshots no README.** Faltam; o README de portfólio ganharia muito.
 - [ ] **Reintroduzir o editor de pixel como retoque.** Decidido: ele não é
       pra desenhar do zero (a 32×48 são 1.536 pixels, ninguém faria), e sim
@@ -358,9 +383,32 @@ precisa ser refeito.
 - [x] Removidos o editor pixel a pixel e o template de 8×14, que dependiam do
       sprite gerado por código
 
+### Lobby, lista de salas e deploy
+
+- [x] Lobby: sala oficial `lobby`, criada no boot do `RoomManager`, imune à
+      faxina de salas vazias, teto de 30 contra 12 da sala comum
+- [x] `Room.resumo()` e `/api/salas` — presença, não nota (ver decisão
+      travada). Exige sessão: a lista revela quem está onde
+- [x] Lista na home com os avatares renderizados, recarregando a cada 8s e
+      só com a aba visível
+- [x] Botões `lobby`, `salas` e `✕` na barra de título da sala
+- [x] Deploy no Fly: app `2gether`, volume `dados` em `gru`, build remoto
+- [x] **Persistência verificada de verdade:** conta criada, máquina
+      reiniciada, login continuou funcionando
+
 ### Bugs achados e corrigidos
 
 Todos apareceram rodando, nenhum aparecia lendo o código:
+
+- Balão de fala sem a setinha apontando pra cabeça de quem falou; junto, o
+  `text-align: center` herdado do `.pessoa` deixava a última linha de um
+  balão de várias linhas boiando no meio
+- Bonequinhos da lista de salas vazando 20px pra cima, por cima da legenda
+  do fieldset: o canvas do sprite tem 51px (48 do boneco + folga do pulo) e
+  a faixa tinha 26px
+- Título da sala mostrava o texto cru digitado enquanto o chat mostrava o
+  slug — "teste de QA" contra "teste-de-qa". Agora os dois vêm do código
+  canônico que o servidor devolve no `bemvindo`
 
 - Balão de fala saía uma letra por linha (`max-width` não resolve contra um
   pai de 32px; precisa de `width: max-content`)
@@ -384,5 +432,14 @@ Todos apareceram rodando, nenhum aparecia lendo o código:
   que algo não funcionou.
 - **PowerShell expande `*` em argumento.** Passar `--forwarded-allow-ips '*'`
   quebra; usar a variável de ambiente `FORWARDED_ALLOW_IPS` no lugar.
+- **`flyctl ssh console -C` quebra o comando por espaço.** Não adianta
+  brigar com aspas: pra rodar algo com espaços na máquina do Fly, use um
+  comando de token único (`rm -f /caminho`) ou abra sessão interativa.
+- **Testar disponibilidade de um domínio envenena o cache do DNS.** A
+  consulta a `2gether.fly.dev` antes de o app existir deixou o NXDOMAIN
+  cacheado, e o site "não abria" depois do deploy. `Clear-DnsClientCache`
+  resolve.
+- **O deploy do Fly avisa que a app não está escutando, e mente.** É corrida
+  entre o check e o uvicorn subir. Confira `flyctl logs` antes de investigar.
 - **Não commitar `dados.sqlite3`.** Tem hash de senha. Já está no
   `.gitignore`, mas conferir antes de qualquer push.

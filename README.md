@@ -12,8 +12,9 @@ Sites de assistir junto existem (Watch2Gether, Teleparty, Kosmi) e são bons.
 Mas todos tratam a sala como link descartável: cria, manda, acaba. A aposta
 aqui é o contrário — sala fixa, gente recorrente, identidade visual própria.
 
-> **Status:** em construção. A sala, o chat, as contas e o editor de avatar
-> funcionam. A sincronia de vídeo e o compartilhamento de tela ainda não.
+> **Status:** no ar em **<https://2gether.fly.dev>**. A sala, o chat, as
+> contas, o lobby e o editor de avatar funcionam. A sincronia de vídeo e o
+> compartilhamento de tela ainda não.
 >
 > O caminho completo até o MVP, com as decisões e o porquê de cada uma, está
 > em **[docs/PLANO.md](docs/PLANO.md)**.
@@ -24,6 +25,10 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
 
 - **Conta com senha** — apelido, senha, e o boneco preso à conta
 - **Sala em tempo real** — entra pelo nome; quem digita o mesmo nome cai junto
+- **Lobby** — sala oficial onde cai quem não tem destino, com teto maior
+  (30) que o de uma sala comum (12)
+- **Lista de salas com gente agora** — quantas pessoas, quem são, e os
+  bonequinhos delas em miniatura
 - **Bonequinho que anda** — setas, WASD ou clique no chão, com quem está na
   frente cobrindo quem está atrás
 - **Chat** com balão de fala sobre a cabeça
@@ -34,6 +39,7 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
 
 - Sincronia de vídeo do YouTube (é a próxima etapa, e a mais difícil)
 - Compartilhamento de tela por WebRTC
+- Sala privada — qualquer um logado entra em qualquer sala
 - Histórico da sala — a sala some quando o servidor reinicia; as contas não
 
 ---
@@ -68,6 +74,15 @@ Trocar a cor de uma peça muda o matiz e mantém a claridade de cada pixel, em
 vez de chapar tudo — o sombreado que o artista desenhou sobrevive. Pixel
 abaixo de 16% de claridade fica como está, senão o contorno preto viraria
 uma versão escura da cor escolhida e o boneco perderia definição.
+
+**A lista de salas mostra presença, não nota.**
+Chegou a ser considerado um sistema de avaliação das salas, e foi descartado.
+Quem olha a lista não quer saber se a sala é "boa" — quer saber **se tem
+gente lá e quem é**. Presença responde isso melhor, e ainda evita três
+problemas que a nota traria: entre poucos amigos uma nota é dois votos, ou
+seja ruído; ranking cria sala "mal avaliada", que entre amigos é
+constrangimento; e descoberta por nota é o modelo de lista de servidor
+público, que é justamente o que a tese deste projeto rejeita.
 
 **O catálogo de peças é lido da pasta.**
 `/api/pecas` monta a lista a partir de `static/sprites/`. Acrescentar uma
@@ -122,15 +137,33 @@ funciona com a máquina ligada.
 
 ### Botar no ar
 
+Já está: **<https://2gether.fly.dev>**. Pra reproduzir do zero:
+
 ```powershell
-fly launch --no-deploy
-fly volumes create dados --size 1 --region gru
-fly deploy
+winget install --id Fly-io.flyctl   # o comando é `flyctl`, não `fly`
+flyctl auth login
+flyctl apps create <nome> --org personal
+flyctl volumes create dados --size 1 --region gru --app <nome>
+flyctl deploy --remote-only        # --remote-only dispensa Docker local
 ```
 
-O `fly.toml` já vem com volume em `/data` (sem ele, todo deploy apagaria as
-contas), região São Paulo, e uma máquina só — o estado da sala vive em
-memória, então dois usuários em máquinas diferentes não se enxergariam.
+`apps create` em vez de `fly launch` de propósito: o `launch` reescreve o
+`fly.toml` e derrubaria os comentários e os ajustes de volume, região e
+concorrência que estão lá.
+
+**O volume tem que existir antes do primeiro deploy.** Sem ele a app sobe
+sem disco e cada atualização apaga apelido, senha, boneco e guarda-roupa de
+todo mundo.
+
+O `fly.toml` vem com volume em `/data`, região São Paulo, e uma máquina só —
+o estado da sala vive em memória, então dois usuários em máquinas diferentes
+não se enxergariam.
+
+A máquina dorme quando não tem ninguém (`min_machines_running = 0`): o
+primeiro a chegar espera ~2s, e as salas abertas somem junto (as contas
+não). Deploy também costuma cuspir um `WARNING: The app is not listening on
+the expected address` — é corrida de tempo entre o check e o uvicorn subir;
+confira o log antes de achar que quebrou.
 
 Vercel não serve: é serverless e não segura conexão WebSocket aberta.
 
@@ -196,8 +229,11 @@ terceiros — estão em **[docs/ARTE.md](docs/ARTE.md)**.
 ## Limitações conhecidas
 
 - Estado da sala em memória: reiniciou, esvaziou
-- Máximo 12 pessoas por sala (`MAX_POR_SALA` em `app/rooms.py`)
+- Máximo 12 pessoas por sala e 30 no lobby (`app/rooms.py`)
 - Sem recuperação de senha
 - A arte atual é provisória (andaime gerado por script)
 - Só existe uma vista do boneco, espelhada — falta frente e costas
 - Qualquer um logado entra em qualquer sala se souber o nome
+- A lista de salas mostra o apelido de todo mundo que está online pra
+  qualquer pessoa logada — entre amigos é o objetivo, numa sala aberta ao
+  público é outra conversa

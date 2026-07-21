@@ -49,6 +49,9 @@ $("#titulo").textContent = "■ sala :: " + codigo;
 /* ------------------------------------------------------------ estado */
 
 const gente = new Map();   // uid -> pessoa
+// O código de verdade é o slug que o servidor devolve no "bemvindo": digitar
+// "Quinta à Noite" cai em "quinta-a-noite", e é esse que vale pra comparar.
+let codigoReal = codigo;
 let meuUid = null;
 let ws = null;
 let tentativas = 0;
@@ -295,7 +298,19 @@ function enviarChat() {
 $("#enviar").onclick = enviarChat;
 $("#dizer").addEventListener("keydown", (e) => { if (e.key === "Enter") enviarChat(); });
 
-$("#sair").onclick = () => { saindo = true; location.href = "/"; };
+/* `saindo` avisa o laço de reconexão que a queda do socket foi de propósito
+   — sem isso ele tentaria reconectar durante a navegação. */
+function sairPara(destino) {
+  saindo = true;
+  location.href = destino;
+}
+
+$("#sair").onclick = () => sairPara("/");
+$("#trocar").onclick = () => sairPara("/");
+$("#irLobby").onclick = () => {
+  if (codigoReal === "lobby") return sistema("você já está no lobby");
+  sairPara("/sala/lobby");
+};
 
 /* ------------------------------------------------------------ editor */
 
@@ -426,7 +441,10 @@ function receber(m) {
         if (!gente.has(u.uid)) novaPessoa(u, u.uid === meuUid);
       }
       if (!gente.has(meuUid)) novaPessoa(m.eu, true);
-      sistema(`você entrou em "${m.sala.code}"`);
+      codigoReal = m.sala.code;
+      document.title = codigoReal + " — sala";
+      $("#titulo").textContent = "■ sala :: " + codigoReal;
+      sistema(`você entrou em "${codigoReal}"`);
       pintarLista();
       break;
     }
