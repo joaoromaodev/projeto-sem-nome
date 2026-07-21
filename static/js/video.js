@@ -101,6 +101,10 @@ export async function montarPlayer(alvo, callbacks) {
       events: {
         onReady: () => {
           pronto = true;
+          // O volume é escolhido antes de existir player (a pessoa mexe no
+          // controle com a sala ainda sem vídeo). Guardamos e aplicamos
+          // aqui, senão a escolha dela seria descartada em silêncio.
+          aplicarVolume();
           if (pendente) { aplicar(pendente); pendente = null; }
           resolve(player);
         },
@@ -223,6 +227,34 @@ function corrigirDeriva(alvo) {
    pra quem apertou o botão. É isso que garante que os quatro assistam o
    mesmo instante em vez de cada um obedecer ao próprio clique. */
 
+/* ------------------------------------------------------------ volume
+
+   O volume é de cada um, e é o único ajuste do vídeo que não passa pelo
+   servidor: play, pause e seek mudam o que a sala inteira vê e por isso
+   exigem o controle remoto; volume só mexe no ouvido de quem mexeu. Quem
+   está de fone no escritório não deveria precisar pedir licença — nem
+   estourar o som dos outros ao ajustar o seu. */
+
+let volume = 100;
+
+function aplicarVolume() {
+  if (!player) return;
+  try {
+    // mute/unMute além do setVolume: em 0 o YouTube ainda deixa passar um
+    // fiapo de som em alguns navegadores.
+    if (volume === 0) player.mute();
+    else { player.unMute(); player.setVolume(volume); }
+  } catch { /* player ainda engatinhando; o onReady reaplica */ }
+}
+
+export function porVolume(v) {
+  volume = Math.max(0, Math.min(100, Math.round(v)));
+  aplicarVolume();
+  return volume;
+}
+
+export function volumeAtual() { return volume; }
+
 export function posicaoAtual() {
   return seguro(() => player.getCurrentTime(), 0);
 }
@@ -251,6 +283,11 @@ export function diagnostico() {
     pos: seguro(() => player && player.getCurrentTime(), null),
     estado: seguro(() => player && player.getPlayerState(), null),
     taxa: seguro(() => player && player.getPlaybackRate(), null),
+    // o volume que queremos e o que o player realmente está usando: se os
+    // dois discordarem, o ajuste não chegou lá
+    volumeQuero: volume,
+    volumeReal: seguro(() => player && player.getVolume(), null),
+    mudo: seguro(() => player && player.isMuted(), null),
   };
 }
 

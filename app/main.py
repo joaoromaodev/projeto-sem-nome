@@ -588,4 +588,30 @@ async def ws_sala(ws: WebSocket, code: str):
                 ))
 
 
-app.mount("/", StaticFiles(directory=ESTATICO), name="static")
+class EstaticoSemCache(StaticFiles):
+    """Arquivos estáticos que sempre revalidam antes de serem reusados.
+
+    Sem isto o `StaticFiles` responde sem nenhum cabeçalho de cache, e o
+    navegador decide por heurística quanto tempo guardar. Na prática isso
+    significa que **um deploy pode não chegar em quem já visitou o site**:
+    a pessoa continua com o JS antigo e o servidor novo, que é a receita
+    de bug impossível de reproduzir ("aqui funciona").
+
+    Custou uma investigação pra achar: um `export` novo do `video.js`
+    simplesmente não existia no navegador, embora o servidor já o
+    estivesse entregando.
+
+    `no-cache` não quer dizer "não guarde" — quer dizer "guarde, mas
+    pergunte antes de usar". Com o ETag que o StaticFiles já manda, a
+    pergunta volta 304 sem corpo, então o custo é um ida-e-volta curto e
+    não o arquivo inteiro. Pra um site deste tamanho é troca barata pela
+    garantia de que o que está no ar é o que a pessoa vê.
+    """
+
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
+app.mount("/", EstaticoSemCache(directory=ESTATICO), name="static")

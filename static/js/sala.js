@@ -633,6 +633,66 @@ $("#btVoltar").onclick  = () => enviar({ type: "video_seek", pos: video.posicaoR
 $("#btAvancar").onclick = () => enviar({ type: "video_seek", pos: video.posicaoRelativa(10) });
 $("#btPular").onclick   = () => enviar({ type: "video_pular" });
 
+/* ------------------------------------------------------------ volume
+
+   Ajuste de cada um: não vai pro servidor e não exige o controle remoto.
+   Play, pause e seek mudam o que a sala inteira vê; volume só mexe no
+   ouvido de quem mexeu.
+
+   Fica guardado no navegador porque a alternativa é a pessoa reajustar
+   toda vez que entra — e quem baixou o volume por estar no escritório vai
+   querer ele baixo na próxima também. */
+const VOLUME_CHAVE = "volume";
+
+function lerVolumeGuardado() {
+  const v = Number(localStorage.getItem(VOLUME_CHAVE));
+  return Number.isFinite(v) && v >= 0 && v <= 100 ? v : 100;
+}
+
+let volumeAntesDoMudo = 100;
+
+function pintarVolume(v) {
+  $("#volume").value = String(v);
+  $("#volumeNum").textContent = v;
+  $("#mudo").textContent = v === 0 ? "🔇" : v < 50 ? "🔉" : "🔊";
+  $("#mudo").title = v === 0 ? "voltar o som" : "mudo";
+}
+
+function porVolume(v, guardar = true) {
+  const vol = video.porVolume(v);
+  pintarVolume(vol);
+  if (guardar) {
+    try { localStorage.setItem(VOLUME_CHAVE, String(vol)); } catch { /* modo privado */ }
+  }
+  return vol;
+}
+
+$("#volume").addEventListener("input", (e) => {
+  const v = Number(e.target.value);
+  if (v > 0) volumeAntesDoMudo = v;
+  porVolume(v);
+});
+
+$("#mudo").onclick = () => {
+  if (video.volumeAtual() === 0) {
+    // volta pro que era antes; se a pessoa tinha deixado em 0 e saiu,
+    // 100 é melhor que continuar mudo sem entender por quê
+    porVolume(volumeAntesDoMudo || 100);
+  } else {
+    volumeAntesDoMudo = video.volumeAtual();
+    porVolume(0);
+  }
+};
+
+// aplica o que estava guardado assim que a página abre
+porVolume(lerVolumeGuardado(), false);
+
+/* Gancho de depuração no console: `sala.video()` mostra o que o player
+   está fazendo de verdade — posição, estado, taxa e volume. A sincronia é
+   a parte difícil deste projeto e é toda invisível; sem isto, investigar
+   dessincronia vira adivinhação. Só lê, não muda nada. */
+window.sala = { video: () => video.diagnostico() };
+
 /* A fila fica escondida atrás de um botão. Aberta o tempo todo ela comia
    altura da barra mesmo vazia, que é o estado mais comum da sala. */
 $("#verFila").onclick = (e) => {

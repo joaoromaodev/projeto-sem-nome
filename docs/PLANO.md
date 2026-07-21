@@ -71,6 +71,7 @@ saída dela. Lobby e lista de salas prontos. **No ar em
   escondida — **temporária**, ver a nota nas pendências
 - Barra de digitar atravessando o rodapé, conversa ocupando a coluna
   direita inteira, e a lista de nomes trocada por cabecinha + número
+- Volume individual, com mudo e memória entre visitas
 
 **Não funciona ainda:** compartilhamento de tela, sala privada, histórico
 da sala.
@@ -165,6 +166,9 @@ Não reabrir sem motivo novo.
 | **O buraco da tela é transparente no PNG** | A arte da TV vem com a tela em alpha 0, então o iframe fica **atrás** da moldura e aparece pelo buraco — sem máscara, sem `clip-path`, sem recorte. As coordenadas do buraco (x=17, y=28, 46×30 no sprite de 80×80) viram `calc()` no CSS em cima da escala, então mudar a escala move moldura, buraco e vídeo juntos, sem chance de um sair do lugar do outro. |
 | **A buzina nasce com trava, mesmo sendo temporária** | Ela toca som na máquina dos outros — a coisa mais fácil do projeto de virar brincadeira, e quem paga é quem está de fone. A trava (6s) é **por sala e não por pessoa**: o incômodo é o barulho, e pra quem ouve tanto faz se as dez buzinas vieram de um ou de dez. Limitar por pessoa deixaria a sala inteira buzinar em fila com o mesmo efeito. |
 | **A buzina pisca o título além de tocar** | Só o som não resolve: metade do caso de uso é quem está com o volume baixo ou o fone tirado, e só enxerga a barra de abas. O som chama quem escuta; o título piscando chama quem só olha. Ele volta ao normal assim que a pessoa foca a aba, e desiste sozinho depois de 25s. |
+| **Volume é de cada um e não passa pelo servidor** | É o único ajuste do vídeo que não exige o controle remoto. Play, pause e seek mudam o que a sala inteira vê, e por isso são disputa; volume só mexe no ouvido de quem mexeu. Quem está de fone no escritório não deveria pedir licença pra abaixar — nem estourar o som dos outros ao ajustar o seu. Fica guardado no `localStorage` porque quem abaixou por estar no trabalho vai querer baixo na próxima também. |
+| **Mudo usa `mute()`, não volume 0** | Em 0 o YouTube ainda deixa passar um fiapo de som em alguns navegadores. Além disso `mute()` preserva o nível anterior, então voltar do mudo devolve o volume que a pessoa tinha escolhido em vez de chutar 100. |
+| **Estático vai com `Cache-Control: no-cache`** | O `StaticFiles` responde sem nenhum cabeçalho de cache, e aí o navegador decide por heurística quanto guardar — o que significa que **um deploy pode não chegar em quem já visitou o site**: a pessoa fica com o JS antigo falando com o servidor novo. Custou uma investigação pra achar (um `export` novo do `video.js` simplesmente não existia no navegador, embora o servidor já o entregasse). `no-cache` não é "não guarde", é "guarde mas pergunte antes de usar" — e com o ETag que já vinha, a pergunta volta 304 sem corpo. |
 | **"Está digitando" não carrega texto** | Só um liga/desliga. Mandar o que a pessoa escreve antes de ela apertar enter vazaria rascunho — inclusive o que ela escreveu, pensou melhor e apagou. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 
@@ -286,10 +290,30 @@ e a TV ocupa a partir de ~36% — quem caísse atrás dela entrava na sala
 Trocado pra 10..32%. Andar pra trás do móvel e sumir tudo bem, porque foi
 escolha de quem andou; nascer escondido, não.
 
+**Verificado no volume:** o valor guardado voltando do `localStorage` e
+chegando **no player de verdade** depois de recarregar a página
+(`volumeQuero: 25` e `volumeReal: 25`); mudar o slider mexendo nos dois
+juntos; e o mudo deixando `volumeReal` em 60 com `mudo: true` — ou seja,
+silenciando sem perder o nível escolhido.
+
 **Cuidado ao mexer:** `YT.Player` **substitui** o elemento alvo pelo
 iframe em vez de inserir dentro dele. Ou seja, `#player` deixa de ser um
 `div` e passa a ser o próprio `<iframe>` — procurar por `#player iframe`
 não acha nada e parece que o player não montou. Já custou um susto.
+
+**Pra investigar sincronia:** no console, `sala.video()` devolve o que o
+player está fazendo de fato — posição, estado, taxa e volume (o que
+queremos e o que ele está usando; se discordarem, o ajuste não chegou).
+A sincronia é a parte difícil do projeto e é toda invisível — sem isso,
+investigar dessincronia é adivinhação. Só lê, não muda nada.
+
+**Nem todo vídeo do YouTube toca embutido.** O dono pode bloquear a
+reprodução fora do site. Isso apareceu testando com o clipe do Rick
+Astley: o player ficava em `estado: -1` parado no zero, com cara de bug
+nosso. Não era — o app já trata e escreve no chat "o dono desse vídeo não
+deixa tocar fora do YouTube". **Ao testar reprodução, use um vídeo sabido
+livre** ("Me at the zoo", `jNQXAC9IVRw`), senão a investigação vai pro
+lado errado.
 
 **NÃO verificado:** duas pessoas de verdade, em máquinas diferentes,
 assistindo juntas. Todo o teste de sincronia foi feito com um navegador e

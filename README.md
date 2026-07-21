@@ -42,6 +42,8 @@ aqui é o contrário — sala fixa, gente recorrente, identidade visual própria
   mostra a tela verde de TV desligada
 - **Balão de "está digitando"** — três pontinhos sobre a cabeça de quem
   está escrevendo
+- **Volume de cada um** — o único ajuste do vídeo que não passa pelo
+  servidor nem exige o controle remoto, e que o navegador lembra
 - **Controle remoto** — fica no chão da sala; quem pega manda no play,
   pause, avançar e pular, e devolve quando quiser
 - **Fila de vídeos** — qualquer um põe, e o próximo entra sozinho
