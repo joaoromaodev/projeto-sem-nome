@@ -471,16 +471,16 @@ máquinas diferentes assistindo juntas, **com sincronia perfeita**. Era o
 único item que faltava aqui, e era o que separava "a lógica está certa"
 de "a coisa funciona".
 
-**Ainda não sabemos** (o teste aconteceu, mas estes detalhes não foram
-registrados — vale perguntar a quem estava lá antes de assumir
-qualquer coisa):
+**Respondido depois, por quem estava lá (2026-07-22):**
 
-- se alguém entrou pelo **celular**, e como foi
-- se alguém pegou **internet ruim** de verdade — a armadilha 4 tem
-  código, mas ninguém confirmou ter visto buffering real e o aviso no
-  chat aparecendo
-- se a **buzina** foi usada, e se incomodou
-- quanto tempo a sessão durou, e o que a galera fez além de assistir
+- **Celular:** alguém entrou, mas a tela fica **bem quebrada**. O uso é
+  possível e feio. Vira trabalho próprio — ver "Versão mobile" nas
+  pendências. Não é bug de sincronia, é layout.
+- **Internet ruim:** ninguém pegou. A armadilha 4 tem código e continua
+  **sem nunca ter visto buffering real** — segue como não verificado.
+- **Buzina:** foi usada e **"tirou muita risada de todos"**. Isso vira a
+  decisão dela de cabeça pra baixo — ver a nota atualizada nas
+  pendências. Fica.
 
 ### Critério de saída — ✅ cumprido em 2026-07-21
 
@@ -682,18 +682,27 @@ quem quiser assistir em vez de ouvir de fundo.
       empilhado; paleta em popover em vez de grade sempre aberta; ou o
       painel da sala com `max-height` e rolagem, que é o remendo mínimo se
       a arte demorar.
-- [ ] **Tirar a buzina — combinado desde o dia em que entrou.** Ela nasceu
-      pra um uso específico: o autor no escritório, com colegas e chefe na
-      mesma sala, todos de música com a aba escondida — em vez de mandar
-      WhatsApp por algo urgente, aperta o botão e todo mundo olha a aba.
-      Fora desse contexto é só um botão que faz barulho na máquina alheia.
-      Tem teto de 10 por 40s (ver decisões travadas), mas teto não resolve
-      o problema de fundo, que é não ter dono: **qualquer um buzina pra
-      qualquer um**. Se for pra ficar, precisa virar outra
-      coisa — menção com @, ou aviso só pra quem escolheu receber. Pra
-      remover: `BuzinaIn` no `protocol.py`, o ramo no `main.py`,
-      `Room.buzinar`, e o botão + `tocarBuzina`/`chamarAtencao` no
-      `sala.js`.
+- [x] **A buzina fica — o teste real reverteu a decisão de tirar.** Estava
+      combinado remover desde o dia em que entrou: nascera pra um uso
+      específico (o autor no escritório, chamando a atenção de quem estava
+      com a aba escondida) e, fora dele, era "só um botão que faz barulho
+      na máquina alheia" sem dono — qualquer um buzina pra qualquer um.
+      **Mas na noite de 2026-07-21 ela "tirou muita risada de todos".** O
+      que parecia defeito de projeto (barulho sem dono) virou a graça:
+      entre amigos, buzinar uns nos outros é piada, não incômodo. A
+      objeção continua válida **pra sala aberta ao público** — lá volta a
+      ser assédio sonoro sem dono, e aí precisaria virar menção com @ ou
+      aviso opt-in. Entre amigos, mantém como está. O teto de 10 por 40s
+      (ver decisões travadas) segue sendo a trava certa: deixa a rajada,
+      que é justamente a piada, mas não a rajada infinita.
+- [ ] **Versão mobile.** Confirmado na noite de 2026-07-21: dá pra entrar
+      pelo celular, mas a tela fica **bem quebrada**. Não é sincronia (essa
+      funciona), é layout — a sala foi desenhada pra desktop, com barra de
+      vídeo larga, painel flutuante e chão dimensionado pra janela grande.
+      Decisão de produto tomada na hora: **fica pra depois**, o uso real
+      declarado é em desktop/notebook. Quando for a hora, o trabalho é de
+      CSS responsivo, não de lógica. O móvel de decoração já usa Pointer
+      Events (cobre toque), mas nunca foi tocado numa tela de verdade.
 - [ ] **Screenshots no README.** Faltam; o README de portfólio ganharia muito.
 - [ ] **Reintroduzir o editor de pixel como retoque.** Decidido: ele não é
       pra desenhar do zero (a 32×48 são 1.536 pixels, ninguém faria), e sim
