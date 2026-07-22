@@ -1,0 +1,36 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "4308b508-707e-43b1-a452-98a0a146d92c",
+        "name": "Male human base character, bald",
+        "prompt": "Male human base character, bald head with no hair, plain neutral face, \nlight grey skin-tone body, wearing only simple plain grey briefs, \nbarefoot with no shoes, no accessories, no weapons, no jewelry, \nslim symmetrical build, standing straight in a neutral idle pose, \narms slightly away from body, clean flat colors, minimal shading, \nsolid black outline, full body visible and centered",
+        "size": {
+          "width": 92,
+          "height": 92
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-07-22T00:00:15.582099+00:00"
+      },
+      "folder": "Male_human_base_character_bald",
+      "frames": {
+        "rotations": {
+          "south": "Male_human_base_character_bald/rotations/south.png",
+          "south-east": "Male_human_base_character_bald/rotations/south-east.png",
+          "east": "Male_human_base_character_bald/rotations/east.png",
+          "north-east": "Male_human_base_character_bald/rotations/north-east.png",
+          "north": "Male_human_base_character_bald/rotations/north.png",
+          "north-west": "Male_human_base_character_bald/rotations/north-west.png",
+          "west": "Male_human_base_character_bald/rotations/west.png",
+          "south-west": "Male_human_base_character_bald/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-07-22T00:09:01.056613"
+}

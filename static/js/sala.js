@@ -8,8 +8,10 @@
 
 import { desenhar, LARG, ALT_CANVAS, normalizar, definirManifesto } from "./avatar.js";
 import { preaquecer } from "./sprites.js";
+import { preaquecerChar, direcaoDe, NQUADROS } from "./personagem.js";
 import { api } from "./api.js";
 import { montarPainel } from "./editor.js";
+import { montarCenario } from "./cenario.js";
 import * as video from "./video.js";
 
 const $ = (s) => document.querySelector(s);
@@ -44,7 +46,7 @@ const manifesto = await api.pecas();
 definirManifesto(manifesto);
 // Carrega os sprites antes de a sala aparecer, senão dá pra ver o boneco
 // se montando peça por peça.
-await preaquecer(manifesto);
+await Promise.all([preaquecer(manifesto), preaquecerChar("masc")]);
 
 const perfil = { nick: conta.nick, avatar: normalizar(conta.avatar) };
 
@@ -90,7 +92,7 @@ function novaPessoa(dados, souEu) {
     el, cv, ctx: cv.getContext("2d"), nomeEl: nome,
     balao: null, balaoAte: 0,
     pensando: null, pensandoAte: 0,
-    virado: false, andando: false, quadro: 0, tQuadro: 0,
+    virado: false, andando: false, dir: "south", frame: 0, tQuadro: 0,
     sujo: true,
   };
   gente.set(p.uid, p);
@@ -187,16 +189,22 @@ function laco(agora) {
 
     if (p.andando) {
       p.tQuadro += dt;
-      if (p.tQuadro > 0.14) { p.tQuadro = 0; p.quadro ^= 1; p.sujo = true; }
-    } else if (p.quadro !== 0) {
-      p.quadro = 0; p.sujo = true;
+      if (p.tQuadro > 0.12) { p.tQuadro = 0; p.frame = (p.frame + 1) % NQUADROS; p.sujo = true; }
+    } else if (p.frame !== 0) {
+      p.frame = 0; p.sujo = true;
     }
 
     if (p.sujo) {
       // Só considera pronto se todas as camadas entraram. Se alguma ainda
       // estava carregando, tenta de novo no próximo quadro.
-      const completo = desenhar(p.ctx, p.avatar,
-        { esc: PX, andando: p.quadro === 1, virado: p.virado });
+      const completo = desenhar(p.ctx, p.avatar, {
+        esc: PX,
+        passo: p.frame % 2 === 1,   // pulo do paper-doll clássico
+        andando: p.andando,          // caminhada do personagem base
+        dir: p.dir,
+        frame: p.frame,
+        virado: p.virado,
+      });
       p.sujo = !completo;
     }
 
@@ -247,6 +255,7 @@ function andarLocal(eu, dt) {
   eu.pos.y = clamp(eu.pos.y + dy * VEL_Y * dt * norma, LIM.y0, LIM.y1);
 
   if (dx) eu.virado = dx < 0;
+  eu.dir = direcaoDe(dx, dy);
   eu.andando = true;
   eu.sujo = true;
   posicionar(eu);
@@ -274,6 +283,7 @@ function seguirDestino(p, dt) {
     if (Math.abs(dx) > 0.3) p.virado = dx < 0;
   }
 
+  p.dir = direcaoDe(dx, dy);
   p.andando = true;
   p.sujo = true;
   posicionar(p);
@@ -986,6 +996,7 @@ function receber(m) {
       codigoReal = m.sala.code;
       document.title = codigoReal + " — sala";
       $("#titulo").textContent = "■ sala :: " + codigoReal;
+      montarCenario(chao, codigoReal);
       sistema(`você entrou em "${codigoReal}"`);
       pintarLista();
       // Os títulos entram antes de qualquer coisa que mostre vídeo, senão

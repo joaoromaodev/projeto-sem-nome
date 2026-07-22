@@ -16,8 +16,13 @@
  */
 
 import { camada, LARG, ALT, ALT_CANVAS, MARGEM_TOPO } from "./sprites.js";
+import { ehBase, desenharChar } from "./personagem.js";
 
 export { LARG, ALT, ALT_CANVAS, MARGEM_TOPO };
+
+/* Personagens "base" disponíveis (sprites prontos de 8 direções). Vazio = o
+   boneco clássico paper-doll. O feminino entra quando tiver caminhada. */
+export const BASES = ["masc"];
 
 /* Ordem importa: é a ordem de desenho. */
 export const CAMADAS = ["pele", "pernas", "sapatos", "torso", "cabelo"];
@@ -52,6 +57,7 @@ export function pecasDe(nomeCamada) {
 export function avatarPadrao() {
   const primeira = (c) => (MANIFESTO[c] && MANIFESTO[c][0]) || "";
   return {
+    base: "",
     pele: "#ffdbac",
     pernas: primeira("pernas"),   pernas_cor: "#23203a",
     sapatos: primeira("sapatos"), sapatos_cor: "#12101a",
@@ -85,8 +91,10 @@ export function normalizar(a) {
     const lista = MANIFESTO[nomeCamada] || [];
     return lista.includes(v) ? v : padrao;
   };
+  const baseVal = (v) => (ehBase(v) ? v : "");
 
   return {
+    base: baseVal(a.base),
     pele: cor(a.pele, d.pele),
     pernas: peca(a.pernas, "pernas", d.pernas),
     pernas_cor: cor(a.pernas_cor, d.pernas_cor),
@@ -110,28 +118,40 @@ function corDe(nomeCamada, av) {
 }
 
 /**
- * Desenha o boneco.
+ * Desenha o boneco. Roteia: se o avatar tem `base`, é o personagem novo de
+ * 8 direções (personagem.js); senão é o paper-doll clássico daqui.
  *
  * @param esc      escala inteira (2 = cada pixel do sprite vira 2x2 na tela)
- * @param andando  aplica o pulo
- * @param virado   espelha na horizontal
- * @param sombra   desenha a sombra do chão (encolhe no pulo)
+ * @param passo    paper-doll: aplica o pulo neste quadro (bob de caminhada)
+ * @param dir      base: direção de 8 ("south", "north-east", ...)
+ * @param andando  base: usa o ciclo de caminhada
+ * @param frame    base: índice do quadro de caminhada
+ * @param virado   espelha na horizontal (só paper-doll)
+ * @param sombra   desenha a sombra do chão
  */
 export function desenhar(ctx, avatar, opts = {}) {
-  const { esc = 2, andando = false, virado = false, sombra = true } = opts;
   const av = normalizar(avatar);
+
+  if (av.base) {
+    return desenharChar(ctx, av.base, {
+      esc: opts.esc, dir: opts.dir, andando: opts.andando,
+      frame: opts.frame, sombra: opts.sombra,
+    });
+  }
+
+  const { esc = 2, passo = false, virado = false, sombra = true } = opts;
 
   const L = LARG * esc;
   const A = ALT_CANVAS * esc;
   ctx.clearRect(0, 0, L, A);
   ctx.imageSmoothingEnabled = false;
 
-  const salto = andando ? -2 * esc : 0;
+  const salto = passo ? -2 * esc : 0;
 
   // A sombra fica no chão e encolhe quando o boneco sobe. É ela que faz o
   // pulo parecer intenção, e não falha de desenho.
   if (sombra) {
-    const raio = (andando ? 7 : 9.5) * esc;
+    const raio = (passo ? 7 : 9.5) * esc;
     ctx.save();
     ctx.fillStyle = "rgba(0,0,0,.34)";
     ctx.beginPath();
