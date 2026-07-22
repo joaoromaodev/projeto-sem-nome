@@ -1,0 +1,36 @@
+{
+  "group_id": null,
+  "states": [
+    {
+      "character": {
+        "id": "29f05b25-2056-4062-a7a0-583f344aee93",
+        "name": "Female human base character, bald",
+        "prompt": "Female human base character, bald head with no hair, plain neutral face, \nlight grey skin-tone body, wearing only a simple plain grey sports bra and briefs, \nbarefoot with no shoes, no accessories, no jewelry, no weapons, \nslim symmetrical build, standing straight in a neutral idle pose, \narms slightly away from body, clean flat colors, minimal shading, \nsolid black outline, full body visible and centered",
+        "size": {
+          "width": 88,
+          "height": 88
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-07-22T00:08:24.983517+00:00"
+      },
+      "folder": "Female_human_base_character_bald",
+      "frames": {
+        "rotations": {
+          "south": "Female_human_base_character_bald/rotations/south.png",
+          "south-east": "Female_human_base_character_bald/rotations/south-east.png",
+          "east": "Female_human_base_character_bald/rotations/east.png",
+          "north-east": "Female_human_base_character_bald/rotations/north-east.png",
+          "north": "Female_human_base_character_bald/rotations/north.png",
+          "north-west": "Female_human_base_character_bald/rotations/north-west.png",
+          "west": "Female_human_base_character_bald/rotations/west.png",
+          "south-west": "Female_human_base_character_bald/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-07-22T00:13:02.467950"
+}

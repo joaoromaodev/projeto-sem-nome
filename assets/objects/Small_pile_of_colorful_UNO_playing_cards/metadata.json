@@ -1,0 +1,22 @@
+{
+  "group_id": null,
+  "objects": [
+    {
+      "id": "6beb58a8-bd5c-41e9-8360-1df70a38d82c",
+      "name": null,
+      "prompt": "Small pile of colorful UNO playing cards",
+      "size": {
+        "width": 48,
+        "height": 48
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/unknown.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.0",
+  "export_date": "2026-07-22T01:12:54.222334"
+}

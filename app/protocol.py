@@ -66,15 +66,24 @@ def _peca(v: str) -> str:
 
 
 class Avatar(BaseModel):
-    """Aparência do bonequinho: cinco camadas, cada uma com peça e cor.
+    """Aparência do bonequinho.
 
-    A `pele` é a base e não tem variante — só cor. As outras quatro apontam
-    pra um arquivo em static/sprites/ (ex.: torso="jaqueta" vira
-    torso-jaqueta.png). Peça vazia significa "sem esta camada".
+    Dois modos, decididos por `base`:
+      - base == ""      → paper-doll clássico: cinco camadas (pele + quatro
+                          peças) com cor cada, montadas no cliente.
+      - base != ""      → personagem pronto de 8 direções (ex.: "masc"),
+                          servido em static/sprites/chars/. Nesse caso as
+                          camadas abaixo são ignoradas no desenho, mas seguem
+                          válidas pra quem voltar ao clássico.
 
-    Tudo isso cabe em ~150 bytes, então trocar de roupa no meio da sala não
-    pesa na rede.
+    Quem valida se a `base` existe de fato é o cliente (olhando o catálogo),
+    igual às peças — o servidor só garante o formato. Campo novo e opcional,
+    então avatar antigo (sem `base`) continua válido: cai no clássico.
+
+    Tudo isso cabe em ~150 bytes, então trocar no meio da sala não pesa na rede.
     """
+
+    base: str = ""
 
     pele: str = "#ffdbac"
 
@@ -93,6 +102,7 @@ class Avatar(BaseModel):
     _c = field_validator("pele", "pernas_cor", "sapatos_cor",
                          "torso_cor", "cabelo_cor")(_cor)
     _p = field_validator("pernas", "sapatos", "torso", "cabelo")(_peca)
+    _b = field_validator("base")(_peca)   # mesmo formato de peça (só valida a forma)
 
 
 class Pos(BaseModel):

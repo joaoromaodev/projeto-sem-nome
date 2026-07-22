@@ -120,6 +120,27 @@ label { user-select: none; }
   background: linear-gradient(#5578a3, var(--chao));
 }
 
+/* ------------------------------------------------- cenário (móveis)
+   Cada móvel é um <img> posto em % pelo cenario.js. Aqui só o visual:
+   pixel-art sem suavização, ancorado pela base como o boneco. */
+.movel {
+  position: absolute;
+  transform: translateX(-50%);
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Sala escritório: piso de porcelanato branco acinzentado no lugar do
+   azul padrão, e sem o gradiente de "fundo de sala". */
+#chao.escritorio {
+  background:
+    repeating-linear-gradient(0deg,  #0000 0 39px, #c9ccd2 39px 40px),
+    repeating-linear-gradient(90deg, #0000 0 39px, #c9ccd2 39px 40px),
+    #eef0f3;
+}
+#chao.escritorio:before { display: none; }
+
 .pessoa {
   position: absolute;
   transform: translateX(-50%);
@@ -256,6 +277,19 @@ label { user-select: none; }
   border-color: var(--escuro) #fff #fff var(--escuro);
   box-shadow: inset 1px 1px 0 var(--sombra);
   background: #d8d8d8;
+}
+
+/* seletor de personagem (clássico / base pronta) */
+.ed-base {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.ed-base-rot { font-size: 11px; font-weight: bold; margin-right: 2px; }
+.ed-base-bt { padding: 3px 8px; font-size: 11px; }
+.ed-base-bt.ativa {
+  border-color: var(--escuro) #fff #fff var(--escuro);
+  box-shadow: inset 1px 1px 0 var(--sombra);
+  background: #d8d8d8; font-weight: bold;
 }
 
 /* presets */
