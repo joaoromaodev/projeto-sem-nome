@@ -1,0 +1,22 @@
+{
+  "group_id": null,
+  "objects": [
+    {
+      "id": "74509a3d-c4d3-4716-be5c-f5a1441192d8",
+      "name": null,
+      "prompt": "Black computer keyboard with a pink mouse",
+      "size": {
+        "width": 48,
+        "height": 48
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/unknown.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.0",
+  "export_date": "2026-07-22T01:13:19.911322"
+}

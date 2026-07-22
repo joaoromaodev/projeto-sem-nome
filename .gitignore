@@ -1,3 +1,7 @@
 dados.sqlite3
 __pycache__/
 *.pyc
+
+# páginas de prévia (dev): servidas publicamente, não vão pro deploy
+static/preview-*.html
+static/_*.png

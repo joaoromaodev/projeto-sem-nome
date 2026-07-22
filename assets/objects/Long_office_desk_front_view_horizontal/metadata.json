@@ -1,0 +1,22 @@
+{
+  "group_id": null,
+  "objects": [
+    {
+      "id": "194c0664-7092-443b-af9c-5199fd3c7516",
+      "name": null,
+      "prompt": "Long office desk front view, horizontal beige wood top with central divider, metallic legs, north side",
+      "size": {
+        "width": 48,
+        "height": 48
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/unknown.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.0",
+  "export_date": "2026-07-22T01:31:53.708508"
+}

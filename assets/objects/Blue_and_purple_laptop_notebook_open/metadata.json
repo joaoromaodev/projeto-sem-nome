@@ -1,0 +1,22 @@
+{
+  "group_id": null,
+  "objects": [
+    {
+      "id": "66b99206-adfc-4756-8bd0-8ef64c54ce50",
+      "name": null,
+      "prompt": "Blue and purple laptop notebook, open",
+      "size": {
+        "width": 48,
+        "height": 48
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/unknown.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.0",
+  "export_date": "2026-07-22T01:12:52.868853"
+}

@@ -8,9 +8,12 @@
 
 import {
   desenhar, normalizar, avatarAleatorio, pecasDe,
-  LARG, ALT_CANVAS, SUGESTOES, COM_PECA,
+  LARG, ALT_CANVAS, SUGESTOES, COM_PECA, BASES,
 } from "./avatar.js";
 import { api } from "./api.js";
+
+// nome amigável de cada personagem base
+const NOME_BASE = { masc: "Masculino", fem: "Feminino" };
 
 const ROTULOS = {
   pele: "Pele",
@@ -50,8 +53,11 @@ export function montarPainel(raiz, perfil, aoMudar, opts = {}) {
     </div>` : ""}
 
     <div class="ed-painel" data-painel="roupa">
-      <div class="ed-pecas"></div>
-      <button type="button" class="ed-sortear">Sortear tudo</button>
+      <div class="ed-base"></div>
+      <div class="ed-roupa">
+        <div class="ed-pecas"></div>
+        <button type="button" class="ed-sortear">Sortear tudo</button>
+      </div>
     </div>
 
     <div class="ed-painel esconde" data-painel="armario">
@@ -73,8 +79,16 @@ export function montarPainel(raiz, perfil, aoMudar, opts = {}) {
 
   let passo = false;
   function repintar() {
-    desenhar(ctx, perfil.avatar, { esc, andando: passo });
+    // paper-doll usa `passo` (pulo); base mostra a pose parada de frente
+    desenhar(ctx, perfil.avatar, { esc, passo, andando: false, dir: "south" });
     const av = normalizar(perfil.avatar);
+
+    // reflete o personagem escolhido e esconde as roupas se for base nova
+    raiz.querySelectorAll(".ed-base-bt").forEach((b) =>
+      b.classList.toggle("ativa", b.dataset.base === av.base));
+    const roupa = raiz.querySelector(".ed-roupa");
+    if (roupa) roupa.classList.toggle("esconde", !!av.base);
+
     for (const c of ORDEM) {
       const alvo = raiz.querySelector(`[data-peca-nome="${c}"]`);
       if (alvo) alvo.textContent = av[c] || "nenhum";
@@ -163,6 +177,22 @@ export function montarPainel(raiz, perfil, aoMudar, opts = {}) {
     const c = e.target.dataset.cor;
     if (!c) return;
     perfil.avatar[c === "pele" ? "pele" : `${c}_cor`] = e.target.value;
+    mudou();
+  });
+
+  /* ---------------------------------------------------- personagem (base) */
+
+  const caixaBase = raiz.querySelector(".ed-base");
+  caixaBase.innerHTML = `
+    <span class="ed-base-rot">Personagem</span>
+    <button type="button" class="ed-base-bt" data-base="">Clássico</button>
+    ${BASES.map((b) =>
+      `<button type="button" class="ed-base-bt" data-base="${b}">${NOME_BASE[b] || b}</button>`).join("")}`;
+
+  caixaBase.addEventListener("click", (e) => {
+    const b = e.target.closest(".ed-base-bt");
+    if (!b) return;
+    perfil.avatar.base = b.dataset.base;   // "" = paper-doll clássico
     mudou();
   });
 

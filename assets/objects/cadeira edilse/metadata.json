@@ -1,0 +1,22 @@
+{
+  "group_id": null,
+  "objects": [
+    {
+      "id": "4267a489-856a-4da4-b228-db47b4a46bd2",
+      "name": null,
+      "prompt": "Office chair back view with a black blazer draped over the backrest, dark blue seat, black frame, facing north",
+      "size": {
+        "width": 48,
+        "height": 48
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/unknown.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.0",
+  "export_date": "2026-07-22T01:31:35.469443"
+}

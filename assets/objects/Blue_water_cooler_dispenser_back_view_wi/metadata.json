@@ -1,0 +1,22 @@
+{
+  "group_id": null,
+  "objects": [
+    {
+      "id": "80c0174b-76d6-48aa-b58f-fc3041641108",
+      "name": null,
+      "prompt": "Blue water cooler dispenser back view with a large bottle on top, facing north",
+      "size": {
+        "width": 48,
+        "height": 48
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/unknown.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.0",
+  "export_date": "2026-07-22T01:31:48.687481"
+}

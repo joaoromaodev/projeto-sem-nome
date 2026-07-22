@@ -1,0 +1,22 @@
+{
+  "group_id": null,
+  "objects": [
+    {
+      "id": "d825da4c-0e38-4096-8427-5a48e97cc8f3",
+      "name": null,
+      "prompt": "Office chair, dark blue seat and backrest, black plastic frame, straight wheeled base",
+      "size": {
+        "width": 48,
+        "height": 48
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/unknown.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.0",
+  "export_date": "2026-07-22T01:13:44.303914"
+}

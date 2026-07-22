@@ -1,0 +1,22 @@
+{
+  "group_id": null,
+  "objects": [
+    {
+      "id": "7cafcac8-74bd-4302-b4b7-ad8d01008dd5",
+      "name": null,
+      "prompt": "Office chair back view with a red cardigan draped over the backrest, dark blue seat, black frame, facing north",
+      "size": {
+        "width": 48,
+        "height": 48
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/unknown.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.0",
+  "export_date": "2026-07-22T01:31:49.695254"
+}

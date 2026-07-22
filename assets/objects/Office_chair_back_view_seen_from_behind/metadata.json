@@ -1,0 +1,22 @@
+{
+  "group_id": null,
+  "objects": [
+    {
+      "id": "cb7e91c2-b20a-4c75-be93-d854de20d619",
+      "name": null,
+      "prompt": "Office chair back view seen from behind, dark blue seat and backrest, black plastic frame, straight wheeled base, facing north",
+      "size": {
+        "width": 48,
+        "height": 48
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/unknown.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.0",
+  "export_date": "2026-07-22T01:31:40.596078"
+}
