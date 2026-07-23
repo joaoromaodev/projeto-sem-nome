@@ -69,9 +69,10 @@ decoração.** **No ar em
 - YouTube sincronizado pelo servidor, com correção de deriva; controle
   remoto como objeto da sala; fila de vídeos; título de cada vídeo pelo
   oEmbed, sem chave de API
-- Móveis na sala: uma TV de tubo (com o vídeo rodando dentro da tela dela,
-  e tela verde quando não tem nada) e um sofá de 3 lugares, com a mesma
-  regra de profundidade dos bonecos
+- Móvel na sala: uma **jukebox**, com a mesma regra de profundidade dos
+  bonecos. O vídeo do YouTube toca escondido atrás dela e ela acende
+  quando tem som rolando — **a sala ouve, não assiste** (ver a decisão
+  travada; a TV de tubo e o sofá saíram em 2026-07-22)
 - "Está digitando": três pontinhos animados sobre a cabeça do boneco **e**
   a linha "fulano está digitando..." embaixo do chat
 - Buzina que toca um som e pisca o título pra chamar quem está com a aba
@@ -87,25 +88,43 @@ decoração.** **No ar em
 - **Sala privada por link de convite**, com o dono trancando pela barra de
   título e o link indo pra área de transferência
 - **Favoritos da sala** — o repertório do grupo; clicar num põe na fila
-- **Decoração:** a TV e o sofá são arrastáveis no modo decorar, e onde
-  ficam é estado da sala que todo mundo vê
+- **Decoração:** a jukebox é arrastável no modo decorar, e onde ela fica é
+  estado da sala que todo mundo vê. Sala com cenário nasce com ela em
+  outro lugar, dito pelo cenário
 - **Quem frequenta**, com o boneco de cada um e apagadinho pra quem não
   está agora
 
 **Não funciona ainda:** compartilhamento de tela, sala privada, histórico
 da sala.
 
-**A arte dos móveis já é definitiva** — é do próprio autor do projeto, não
-placeholder. Fica em `static/moveis/` na resolução nativa (sofá 128×40, TV
-80×80, tela verde 46×30); chegou ampliada 3× e foi reduzida com
-vizinho-mais-próximo, ida e volta conferida como idêntica. **A tela da TV
-é transparente no PNG**, e é isso que deixa o vídeo aparecer por trás sem
-máscara nenhuma.
+**A arte da jukebox é a única provisória que sobrou nos móveis.**
+`ferramentas/gerar_jukebox.py` desenha um andaime de 48×62 pra a sala
+ficar testável — mesmo papel que o `gerar_placeholders.py` faz com o
+boneco. Quando a de verdade chegar, é sobrescrever
+`static/moveis/jukebox.png` e apagar o script; se o tamanho mudar, são
+dois números no CSS (`--juke-l` e `--juke-a`) e mais nada.
 
-**A arte dos bonecos ainda é provisória.** `ferramentas/gerar_placeholders.py` gera
-camadas de andaime pra o sistema ficar testável. Quando os sprites de
-verdade chegarem, é sobrescrever os arquivos em `static/sprites/` e apagar
-esse script — nenhum código muda.
+`static/moveis/tv.png`, `tv-verde.png` e `sofa.png` continuam no
+repositório e **não são mais usados** por nenhum código. Ficaram de
+propósito: são arte do próprio autor, o git guarda de qualquer jeito, e o
+dia em que existir uma segunda tela a TV volta a servir. Apagar é decisão
+de quem desenhou.
+
+**A arte dos bonecos deixou de ser só provisória** (2026-07-21, `eafdff4`
+e `a67ce07`). Chegou um **personagem pronto de 8 direções** com caminhada
+de 9 quadros, e ele convive com o paper-doll clássico em vez de
+substituí-lo: o campo `base` no avatar decide qual dos dois desenha
+(`base: ""` = paper-doll de 5 camadas, `base: "masc"` = personagem
+pronto). As camadas provisórias de `ferramentas/gerar_placeholders.py`
+continuam existindo porque o modo clássico continua existindo — o script
+só sai quando alguém decidir aposentar o paper-doll, e essa decisão não
+foi tomada.
+
+Junto veio a primeira **sala temática**: `escritorio`, um cenário
+decorativo de 50 móveis desenhado no cliente (`static/js/cenario.js`),
+sem passar pelo servidor. Ver a decisão travada sobre isso. Foi ele que
+revelou que a posição padrão do móvel não serve pra sala com cenário —
+ver "O cenário diz onde o móvel nasce".
 
 ### Próximo passo concreto
 
@@ -118,14 +137,24 @@ Em ordem, quando esta sessão for retomada:
    escrevendo código. Perguntar a quem estava lá como foi (celular?
    internet ruim? a buzina?) também vale mais que qualquer tarefa daqui
    pra baixo.
-2. **Receber as 5 camadas de arte** e validar com
-   `python ferramentas/conferir_sprites.py`. O usuário estava produzindo a
-   partir de uma base de 27×46 que ia expandir pra 32×48.
-3. **A Etapa 5 fechou.** Sobrou de fora, de propósito: moderação do lobby
-   e tirar a buzina (ver Pendências), e a Etapa 4 (WebRTC), que segue por
-   último porque é a mais frágil e a que menos gerou entusiasmo. Com a
-   Etapa 3 dependendo da arte chegar, **não há mais fatia grande de
-   código pronta pra pegar** — o que falta agora é uso.
+2. ~~Receber as 5 camadas de arte.~~ **A arte chegou em 2026-07-21**, e
+   não no formato previsto: em vez das 5 camadas de paper-doll, veio um
+   personagem pronto de 8 direções com caminhada. Ver a Etapa 3 e as
+   decisões travadas novas. Conferida rodando em 2026-07-22.
+3. ~~Consertar a TV do escritório.~~ **Feito em 2026-07-22, e virou outra
+   coisa:** a TV e o sofá saíram, entrou uma jukebox, e a sala passou a
+   só ouvir. Ver "A sala ouve, não assiste". Sobrou disso um item de
+   verdade: **ouvir o som saindo com o navegador aberto** — tudo foi
+   conferido medindo o DOM, e ninguém ouviu ainda.
+4. **Arte definitiva da jukebox.** A que está no ar é andaime gerado por
+   script. Sobrescrever `static/moveis/jukebox.png` não pede mudança de
+   código nenhuma.
+4. **A Etapa 5 fechou.** Sobrou de fora, de propósito: moderação do lobby
+   (a buzina **fica** — ver Pendências), e a Etapa 4 (WebRTC), que segue
+   por último porque é a mais frágil e a que menos gerou entusiasmo. O
+   que sobra da Etapa 3 é o editor de avatar (agora um problema menor,
+   ver Pendências) e o editor de retoque. **Nada disso é a prioridade:**
+   a pergunta de baixo continua valendo mais que qualquer item daqui.
 
 ### O que foi verificado, e o que não foi
 
@@ -202,6 +231,82 @@ componente de largura livre dentro de fileira apertada. Corrigido com
 `flex-wrap` na fileira e piso de 120px no rótulo — a 1024 ele quebra em
 duas linhas e o rótulo recupera 138px; a 1280 continua numa linha só.
 
+**Verificado na arte nova e no escritório (2026-07-22, num navegador de
+verdade, medindo pixel de canvas e retângulo de DOM):**
+
+- **As 8 direções paradas existem e são 8 desenhos diferentes.** Cada uma
+  desenhou entre 1.712 e 2.836 pixels opacos, com assinatura de pixel
+  distinta uma da outra. Nenhuma voltou vazia.
+- **A caminhada anda de verdade:** nos 5 quadros amostrados de cada
+  direção, cada quadro tem assinatura própria — não é a mesma imagem
+  repetida com um contador girando por fora.
+- **O espelho do lado leste confere:** `east`, `north-east` e
+  `south-east` andando têm **exatamente a mesma contagem de pixels** que
+  `west`, `north-west` e `south-west` (1.712/2.100/2.064 etc.), que é a
+  prova de que saem da mesma arte virada, e não de arquivo faltando.
+- **Cabeça e pés não são cortados.** O desenho começa na linha 4 do
+  canvas (folga do topo sobrando) e termina na 97, num canvas de 102 —
+  aquele bug antigo de cabeça cortada não voltou com a arte nova.
+- **O escritório monta inteiro:** 50 móveis no `#chao`, **zero imagem
+  quebrada**, zero pendente, z-index de 300 a 700 como o código prevê.
+- **A Etapa 5 sobreviveu ao boneco novo**, item por item: a `base:"masc"`
+  ida ao servidor e voltando em `/api/salas`; "suas salas" com
+  `visitas: 1`; "quem frequenta" abrindo o popover e **desenhando a base
+  nova em 1×** (744 px num canvas 32×51 — ou seja o desenho de uma vez só
+  das listas não ficou vazio, que era o risco); decorar ligando o
+  contorno tracejado e devolvendo `pointer-events` à TV; trancar gerando
+  convite, a sala virando privada em `/api/salas`, destrancar, e o lobby
+  recusando com "o lobby é praça — não tranca"; favoritos com a estrela
+  desligada sem vídeo ("nada tocando pra guardar"), ligando quando o
+  vídeo entra, virando ★ e o contador indo a 1.
+
+**Bug achado aí — a TV some no escritório.** Medido: dos 6.400 px da TV,
+**5.136 estão cobertos por um monitor do cenário**, e o buraco da tela
+(46×30, onde o vídeo aparece) está **100% tapado** — pelo monitor
+(z 506), pelo teclado (511) e pelo notebook (509), todos acima do z 480
+da TV. Não é acaso: a TV e o sofá ficam em posição de sala **vazia**
+(52% e 14%), e a ilha de mesas do escritório foi desenhada por cima
+justamente dessa faixa. Ver a pendência.
+
+**NÃO verificado, e o motivo importa:** ver o boneco andando **ao vivo**.
+O painel do navegador desta sessão não estava sendo exibido, e com
+`document.hidden === true` o `requestAnimationFrame` **não dispara
+nenhuma vez** (medido: 0 quadros em 5,6 s). O laço de animação inteiro do
+projeto pendura nele, então nada anda, nada troca de quadro e o boneco
+não sai do lugar — o que de fora tem cara idêntica a "a caminhada está
+quebrada". Por isso a verificação acima foi feita chamando o desenho
+quadro a quadro e lendo os pixels, que responde "a arte compõe certo em
+cada direção" mas não responde "a animação encadeia bonito na tela". Essa
+segunda pergunta continua aberta e só se responde olhando.
+
+**Verificado na jukebox (2026-07-22, rodando, medindo o DOM):** a TV, o
+sofá e a tela verde **sumiram** do DOM; a jukebox monta em 48×62 com o
+player de 40×24 centrado atrás dela (arte em `::after` z 2, player z 1 —
+a ordem que garante que o vídeo não vaze por cima); no escritório ela
+nasce em 87%/20% e **nada do cenário a cobre** (era 82% coberta antes da
+correção); numa sala sem cenário continua nascendo em 50%/52%; arrastar
+no modo decorar move (50%/52% → 33,5%/41,7%), recalcula o z pra 583 e
+**sobrevive ao recarregar**; a jukebox **acende** quando entra vídeo
+("Me at the zoo — tocando") e apaga sem; zero imagem quebrada e zero erro
+no console.
+
+**Bug pré-existente achado aí:** o aviso de "clique pra soltar o som"
+ficava pendurado pra sempre. Existem **dois** caminhos que liberam o
+áudio — clicar no aviso, e colar um link (colar já é gesto do usuário,
+então pedir clique de novo seria pedir duas vezes) — e só o primeiro
+escondia o aviso. Na TV isso tapava um retângulo de 46×30 e passava
+despercebido; na jukebox tapa o móvel inteiro, com o som tocando por
+trás. Corrigido derivando a visibilidade do estado em vez de ligar e
+desligar na mão, que é a mesma regra que o projeto já aplica ao balão e à
+linha de "está digitando".
+
+**NÃO verificado na jukebox:** que o som **sai de fato**. O painel do
+navegador estava escondido (ver a armadilha do `requestAnimationFrame`), e
+com a aba oculta o autoplay não é o mesmo caso do uso real. O que dá pra
+afirmar é que o player monta, recebe o vídeo, reporta `tocando` e a
+jukebox acende por esse caminho. **Ouvir, ninguém ouviu ainda** — é o
+primeiro teste a fazer com o painel aberto.
+
 **Verificado na migração:** um banco montado com o esquema **de hoje**
 (sem `privada`, `convite` nem `moveis`) ganhou as três colunas no boot,
 com o contador de 42 músicas intacto, e `iniciar()` rodando duas vezes
@@ -273,8 +378,8 @@ Não reabrir sem motivo novo.
 | **A TV é objeto da sala, não widget na coluna** | O vídeo saiu da coluna lateral e foi pra dentro de uma TV que existe no chão — mesma lógica do controle remoto: coisa que está no lugar, não painel numa caixa. |
 | **Móvel desenha em 1×, boneco em 2×** | Parece descuido e não é. A arte dos móveis foi feita com o dobro da densidade de pixel do boneco: o corpo dele ocupa 20×36 do sprite, e a TV ocupa 80×72. Na mesma escala a TV sai com **o dobro da altura de uma pessoa** — foi exatamente assim que ela ficou gigante na primeira tentativa (5×, 400px, ~4× uma pessoa). Em 1× ela lê como TV de tubo, o sofá tem metade da altura de quem está em pé, e tudo continua em pixel inteiro, que é o que mantém a arte nítida. Escala fracionária resolveria a proporção e borraria o pixel — não vale a troca. O botão pra mexer nisso é `--movel`, um número só. |
 | **O sofá foi alargado, não escalado** | Pedido: caber 3 pessoas. Não dá pra resolver com escala — na altura certa (1×) a arte original comportava 1,9 boneco, e ampliar pra caber 3 deixaria o encosto mais alto que uma pessoa. Então a **arte** mudou: 80→128px, repetindo uma faixa do meio (16px, não uma coluna só, pra não esticar o tracejado do encosto) e preservando os braços nas pontas. |
-| **A tela minúscula é aceita por ora** | Com a TV em 1× o vídeo tem 46×30. Foi verificado que o YouTube **toca** nesse tamanho (um vídeo de 19s rodou até o fim e o contador de músicas subiu), mas ninguém assiste um filme aí. Aceito porque o uso real declarado é som de fundo com a aba escondida. Quando quiserem assistir de verdade, a saída não é inflar esta TV — é uma segunda tela, ou clicar nela pra expandir. |
-| **O buraco da tela é transparente no PNG** | A arte da TV vem com a tela em alpha 0, então o iframe fica **atrás** da moldura e aparece pelo buraco — sem máscara, sem `clip-path`, sem recorte. As coordenadas do buraco (x=17, y=28, 46×30 no sprite de 80×80) viram `calc()` no CSS em cima da escala, então mudar a escala move moldura, buraco e vídeo juntos, sem chance de um sair do lugar do outro. |
+| **~~A tela minúscula é aceita por ora~~ — SUPERADA em 2026-07-22** | Ficou registrada porque foi ela que levou à decisão seguinte: o "por ora" durou até alguém perguntar por que existe uma tela que ninguém olha. Ver "A sala ouve, não assiste". O texto original: Com a TV em 1× o vídeo tem 46×30. Foi verificado que o YouTube **toca** nesse tamanho (um vídeo de 19s rodou até o fim e o contador de músicas subiu), mas ninguém assiste um filme aí. Aceito porque o uso real declarado é som de fundo com a aba escondida. Quando quiserem assistir de verdade, a saída não é inflar esta TV — é uma segunda tela, ou clicar nela pra expandir. |
+| **~~O buraco da tela é transparente no PNG~~ — SEM EFEITO desde 2026-07-22** | Valia enquanto existia TV. A jukebox é o contrário: a frente é opaca de propósito e o player fica escondido atrás (ver "A arte da jukebox é camada por cima"). Fica registrada porque a técnica volta a valer no dia da segunda tela. O texto original: A arte da TV vem com a tela em alpha 0, então o iframe fica **atrás** da moldura e aparece pelo buraco — sem máscara, sem `clip-path`, sem recorte. As coordenadas do buraco (x=17, y=28, 46×30 no sprite de 80×80) viram `calc()` no CSS em cima da escala, então mudar a escala move moldura, buraco e vídeo juntos, sem chance de um sair do lugar do outro. |
 | **A buzina deixa floodar, mas tem teto** | Era um intervalo mínimo entre buzinas e estava errado: a rajada é a graça, e quem precisa chamar de verdade buzina várias vezes seguidas. Agora são **10 numa janela de 40s**, sem espera nenhuma entre elas. A trava é **por sala e não por pessoa**: o incômodo é o barulho, e pra quem ouve tanto faz se as dez vieram de um ou de dez. |
 | **A janela é deslizante, não um contador que zera** | Com contador zerando a cada 40s, quem gastasse as 10 no fim de uma janela ganharia mais 10 no começo da seguinte — 20 buzinas seguidas, exatamente o que o teto existe pra impedir. Com janela deslizante cada buzina caduca 40s depois da sua vez, e o limite vale em qualquer trecho de 40s que se olhe. Quando barra, a mensagem diz **quantos segundos faltam** — sem o número, quem foi barrado fica martelando o botão pra descobrir. |
 | **O som é sintetizado, não é arquivo** | Nada pra baixar, nada pra licenciar, nada pra versionar — e o toque é ajustável mexendo em número. A corneta são duas vozes numa quarta justa (Mib e Láb, a razão 1.333 das buzinas de duas bocas), cada uma dobrada e desafinada em 3,5 Hz pra dar o batimento áspero que soa a instrumento, tudo passando por um passa-baixa que abre no ataque e fecha no fim, imitando a boca respondendo ao sopro. Uma nota só soaria despertador; sem o desafino, sintetizador barato. |
@@ -305,12 +410,21 @@ Não reabrir sem motivo novo.
 | **O lobby não tranca, nem forçado no banco** | A rota recusa, e o `Room` ignora a coluna se ela vier ligada. O lobby é o destino padrão de quem entra sem sala; trancado, essa gente não teria pra onde ir. Duas travas porque a consequência é a porta da frente do site. |
 | **Favorito é da sala, não de quem clicou** | A chave é (sala, vídeo): duas pessoas marcando a mesma música é uma linha só. Favorito por pessoa seria playlist pessoal — e playlist pessoal não é o que faz um grupo ter repertório. Pelo mesmo motivo não exige o controle remoto: o controle existe pra ninguém brigar pelo play/pause, não pra decidir o que a sala escuta. |
 | **Clicar num favorito põe na fila** | Sem isso a lista seria enfeite: um lugar pra olhar o que já foi bom e não poder fazer nada com isso. Vai pra fila e não pro play direto porque play atropelaria o que está tocando — que é justamente o que o controle remoto existe pra impedir. |
-| **Arrastar móvel só no modo decorar** | Fora dele o sofá deixa o clique passar (`pointer-events: none`) pra clicar nele mandar o boneco andar até lá — a reação esperada de quem clica num sofá. Se o móvel capturasse o ponteiro o tempo todo, mover a mobília custaria o passeio, e o passeio é a parte que a galera gostou. O modo tem contorno tracejado: modo que muda o que o clique faz precisa aparecer na tela. |
+| **Arrastar móvel só no modo decorar** | Se o móvel pudesse ser empurrado a qualquer momento, mover a mobília custaria o passeio pela sala — e o passeio é a parte que a galera gostou. Com a jukebox tem uma razão a mais: fora do modo decorar, clicar nela é mexer no som (e é o clique que libera o áudio), então arrasto solto viraria play/pause por acidente. O modo tem contorno tracejado: modo que muda o que o clique faz precisa aparecer na tela. *(Até 2026-07-22 esta decisão falava do sofá, que deixava o clique atravessar pra o boneco andar até ele; o sofá saiu.)* |
 | **O móvel anda na hora e só avisa no fim** | Mesma regra do boneco: posição prevista no cliente, servidor só conta aos outros. E a mensagem sai no `pointerup`, não a cada pixel — mandar durante o arrasto encheria o socket pra desenhar a mesma coisa. O servidor não ecoa de volta pra quem arrastou, senão o móvel daria um pulinho quando a resposta chegasse. |
 | **"Estou arrastando?" é estado explícito, não `hasPointerCapture`** | Dava pra perguntar ao próprio elemento se ele capturou o ponteiro. Mas aí a resposta passa a depender de a captura ter dado certo, e quando ela falha o arrasto morre **em silêncio, sem erro nenhum** — o pior tipo de bug pra diagnosticar. Agora a captura é o que ela é de fato: reforço pra o ponteiro não escapar, dentro de um `try`. |
 | **Quem frequenta abre num popover, não numa janela fixa** | A lista de nomes fixa foi cortada de propósito e continua cortada: quem está **agora** já aparece no chão, com boneco e apelido. "Quem costuma estar aqui?" é outra pergunta, e merece resposta — mas só ocupa tela quando alguém pergunta. |
 | **Offline aparece apagadinho em vez de sumir** | Numa sala vazia, ver os bonecos de quem costuma vir é o que faz o lugar parecer de alguém. Sumindo, sala vazia vira tela em branco — que é exatamente a sensação que a Etapa 5 existe pra evitar. |
 | **A coluna nova precisa de remendo, não só de `CREATE TABLE`** | `CREATE TABLE IF NOT EXISTS` não alcança tabela que já existe, e existe um banco no ar com volume. Sem o `ALTER TABLE` no boot, o deploy sobe, a tabela "já está lá", e o app quebra na primeira consulta que usa a coluna nova — falha que **só aparece em produção**, porque local o banco é sempre recriado do zero. Ver `REMENDOS` em `db.py`. |
+| **A sala ouve, não assiste** | Decidido em 2026-07-22, e é a decisão que aposenta a TV e o sofá. A tela de 46×30 sempre foi aceita "por ora" com a justificativa de que o uso real declarado é **som de fundo com a aba escondida** — e depois da noite com gente de verdade essa justificativa deixou de ser provisória e virou o produto. Se ninguém assiste, uma TV é um móvel caro: custa arte, custa buraco transparente, custa `--movel` acertando moldura e vídeo juntos, e ainda ocupa o melhor lugar do chão. Entrou uma **jukebox** no lugar: o vídeo do YouTube continua rodando, o servidor continua sendo dono do relógio, a sincronia não mudou uma linha — só que agora ele toca **escondido atrás do móvel**, e o que a sala vê é a jukebox. O que se ganha não é simplicidade, é foco: o chão volta a ser das pessoas. Quem quiser assistir de verdade um dia, a saída continua sendo a mesma que já estava registrada — uma segunda tela —, e agora ela não compete com nada. |
+| **O sofá saiu junto, e não por tamanho** | Ele não estorvava. Saiu porque era o outro metade de "sala de estar montada pra ver TV", e sem TV ele vira móvel sem função — nunca deu pra sentar nele (`sentar no sofá` era ideia não decidida) e o clique nele já atravessava de propósito. Móvel que não faz nada e não significa nada é enfeite; a sala tem pouco chão. **O preço, registrado:** a decoração da Etapa 5 ficou com **um** objeto arrastável só, o que deixa o modo decorar mais magro do que quando foi feito. A lista `MOVEIS` continua sendo lista de propósito — o dia em que entrar um segundo móvel, nenhum código muda. |
+| **O player fica escondido, mas continua sendo um elemento de verdade** | A tentação óbvia era `display:none` no iframe, já que ninguém vai ver. Não dá: navegador estrangula a reprodução de player sem caixa, e o sintoma é **som que não começa sem erro nenhum no console** — o mesmo tipo de falha silenciosa que a decisão "a buzina espera o áudio acordar" já tinha custado caro uma vez. Então o iframe continua com tamanho (40×24) e renderizado; só fica atrás da arte da jukebox. |
+| **A arte da jukebox é camada por cima, não fundo do móvel** | Parece detalhe de CSS e é o que faz a coisa funcionar. O iframe é **filho** do `#jukebox`, e na ordem de pintura da CSS um filho com `z-index` negativo ainda pinta **acima do fundo** do elemento que abre o contexto de empilhamento. Ou seja: com a arte no `background`, o vídeo apareceria por cima dela — exatamente o que a mudança existe pra impedir. Como `::after` com z-index maior que o do player, ela tapa de verdade. |
+| **O cenário diz onde o móvel nasce** | A TV sumia no escritório: a ilha de mesas cobre a faixa do meio do chão, e a posição padrão (50%, 52%) fica bem debaixo dela — medido, 82% do móvel atrás de um monitor. Trocar a TV pela jukebox **não resolveu nada**, porque o problema nunca foi o móvel, foi o lugar: a jukebox nasceu igualmente enterrada. E aqui é pior que feio — o clique na jukebox é o que libera o áudio (requisito do navegador), então móvel escondido é sala muda. Agora `MOVEIS_POR_SALA` deixa o cenário declarar a posição inicial, e só ela: quem já arrastou tem posição gravada, e a gravada ganha. Sem isso **todo cenário novo reencontra este bug sozinho**. |
+| **O personagem novo não substitui o paper-doll, convive com ele** | A arte de 8 direções chegou como sprite **pronto**, e recolorir camada por cima dele não faz sentido — o desenho já traz roupa. Trocar o paper-doll por ele mataria a customização de peça e cor, que é metade do que a galera destacou. Então o avatar ganhou um campo `base`: vazio é o paper-doll de 5 camadas, preenchido é o personagem pronto. Campo novo e opcional, então avatar antigo continua válido sem migração nenhuma. O preço é o projeto carregar **dois sistemas de desenho** — aceito porque o dia em que um dos dois vencer, apagar o outro é barato; escolher errado agora, não. |
+| **As 3 direções do leste saem espelhando o oeste** | Desenhar as 8 direções da caminhada seria 8 × 9 = 72 quadros. Como o boneco é simétrico o bastante, 5 direções (norte, noroeste, oeste, sudoeste, sul) cobrem tudo: leste, nordeste e sudeste são as suas espelhadas na horizontal. Custou 45 quadros em vez de 72. **As poses paradas não espelham** — lá as 8 existem de verdade, porque parado é o que mais se olha e assimetria (bolso, alça, repartido do cabelo) apareceria. |
+| **O cenário da sala temática é do cliente, não do servidor** | O escritório é decoração fixa: igual pra todo mundo e não muda nunca. Mandar 50 móveis pelo socket, ou gravá-los no banco, seria pagar rede e migração por um dado **constante**. Isso é o oposto da decoração da Etapa 5 (TV e sofá), que é estado da sala justamente porque muda e todo mundo precisa ver mudar. A régua: **o que ninguém pode alterar não precisa ser sincronizado.** |
+| **O móvel do cenário tem faixa de z fixa, não z derivado do y** | Bonecos ordenam por profundidade a partir do `y`, e isso basta pra quem anda no chão. Não basta pro escritório: "em cima da mesa" e "atrás da mesa" podem ter o mesmo `y` e precisam de ordens opostas. Então cada tipo entrou numa faixa (cadeira norte 300, mesa 400, sobre a mesa 500, frente 700) e o `y` só desempata **dentro** da faixa. |
 | **Supabase + Vercel descartado** | Funcionaria via Supabase Realtime, mas jogaria fora o backend inteiro. Pior: a sincronia de vídeo depende do servidor ser fonte da verdade; sem servidor, seria preciso eleger um cliente como dono do relógio, e a sala dessincroniza quando ele fecha a aba. |
 
 ---
@@ -549,7 +663,16 @@ Trocar os bonecos de 8×14 desenhados por código por sprites de verdade.
 - [x] Camadas provisórias pra o sistema ficar testável
 - [ ] **Receber as 5 camadas de verdade** e validar com
       `ferramentas/conferir_sprites.py`
-- [ ] Direção: frente, costas e lado (hoje só existe uma vista, espelhada)
+- [x] **Direção: 8 vistas de verdade.** Chegou em 2026-07-21 (`eafdff4`).
+      Deixou de ser "uma vista espelhada": existem os 8 PNGs de rotação
+      parada, e a caminhada de 9 quadros nas 5 direções do lado oeste. As
+      3 do lado leste saem espelhando o oeste — ver a decisão travada.
+      Código em `static/js/personagem.js`; o campo `base` no avatar
+      (`app/protocol.py`) escolhe entre paper-doll e personagem pronto.
+- [ ] **Caminhada da base feminina.** A `fem` tem as 8 rotações paradas,
+      mas não tem `walk/`. Hoje isso não aparece pra ninguém porque
+      `avatar.js` só oferece `masc` no editor — mas ver a pendência
+      "a fem anda invisível", que é o buraco que sobra.
 - [ ] Reintroduzir o editor de retoque (ver "Pendências")
 
 ### ⚠ Migração
@@ -629,16 +752,18 @@ isso acontece toda vez que a máquina dorme por falta de gente.
       frequentadores, sem cadastro paralelo nenhum
 - [x] Favoritos do grupo — o repertório da sala. Clicar num favorito põe
       na fila, que é o que faz a lista servir pra alguma coisa
-- [x] Decoração: a TV e o sofá viraram estado da sala. Arrastar acontece
-      no **modo decorar**, ligado por um botão
+- [x] Decoração: o móvel virou estado da sala. Arrastar acontece no
+      **modo decorar**, ligado por um botão. *(Era a TV e o sofá; desde
+      2026-07-22 é a jukebox, sozinha — ver "O sofá saiu junto".)*
 Esse conjunto é o que faz alguém abrir o site sem motivo específico — que é
 exatamente o comportamento que o projeto quer.
 
 **A etapa está fechada em código.** O que sobra dela é do mesmo tipo do
 resto do projeto: ninguém usou com gente de verdade ainda. Ideias que
 apareceram no caminho e ficam registradas como *não decididas* — mais
-móveis pra decorar (hoje são dois), sentar no sofá, e uma segunda tela pra
-quem quiser assistir em vez de ouvir de fundo.
+móveis pra decorar (hoje é **um**, a jukebox) e uma segunda tela pra quem
+quiser assistir em vez de ouvir de fundo. *"Sentar no sofá" saiu da lista
+junto com o sofá.*
 
 ---
 
@@ -660,14 +785,48 @@ quem quiser assistir em vez de ouvir de fundo.
       ("a gente se encontra no ___").
 - [ ] **Moderação do lobby.** O lobby é onde estranhos se encontram — é ele
       que transforma moderação de problema teórico em problema de dia um.
+- [x] **A TV some no escritório.** Achado rodando em 2026-07-22: a ilha
+      de mesas cobria a faixa do meio do chão e o buraco da tela ficava
+      **100% tapado** por um monitor do cenário. **Resolvido no mesmo dia,
+      e por duas mudanças, não uma** — porque eram dois problemas
+      empilhados: a TV saiu de vez (ver "A sala ouve, não assiste") e a
+      posição inicial passou a ser do cenário (ver "O cenário diz onde o
+      móvel nasce"). Vale registrar a ordem, porque ela ensina: trocar a
+      TV pela jukebox **não resolveu nada sozinho** — a jukebox nasceu
+      igualmente enterrada, 82% atrás do mesmo monitor. O móvel nunca foi
+      o problema.
+- [ ] **A base feminina anda invisível.** `personagem.js` aceita `fem`
+      como base, e as 8 poses paradas dela desenham (2.332 px, conferido).
+      Mas não existe `chars/fem/walk/` — o GET dá 404, o desenho devolve
+      `false`, e o canvas fica **vazio**: a pessoa some enquanto anda e
+      reaparece ao parar. Hoje ninguém alcança isso pela tela, porque
+      `avatar.js` só oferece `masc` no editor — mas o `protocol.py` só
+      valida formato, então um cliente que mande `base: "fem"` chega lá.
+      Duas saídas: gerar a caminhada dela, ou fazer `ehBase` recusar base
+      sem caminhada. **A segunda é o remendo de 1 linha**; a primeira é o
+      que a gente quer de verdade.
 - [ ] **O editor de boneco não cabe na tela — nos dois lugares.** Achado
-      testando no navegador, em 2026-07-21.
+      testando no navegador, em 2026-07-21. **Remedido em 2026-07-22, e a
+      arte nova mudou o tamanho do problema.**
 
       Dentro da sala, o `#painel` flutuante (`sala.html`) tem largura fixa
       de 200px e **nenhum teto de altura nem rolagem**: as cinco camadas
       empilhadas passam da altura do chão e o fim do editor fica
       inalcançável. Na home (`index.html`), a coluna do editor estica até
       encostar no topo e domina a página.
+
+      **Os números, numa janela de 1280×720:** no modo Clássico o painel
+      da sala tem **843px** e termina 168px abaixo do fim da janela, com
+      `scrollHeight === clientHeight` — ou seja não há rolagem nenhuma
+      pra alcançar o resto. Na home o editor tem **709px** e empurra a
+      página pra 774. **No modo Masculino os mesmos dois caem pra 407px e
+      313px, e cabem folgados**, porque o personagem pronto esconde as
+      cinco fileiras de roupa.
+
+      Isso reenquadra a pendência: **ela agora é só do paper-doll.** Se o
+      personagem pronto virar o padrão, o problema some sozinho pra quase
+      todo mundo e vira caso de borda — o que muda a conta de quanto vale
+      reestruturar.
 
       A causa é a mesma nos dois: o editor cresce linearmente com o número
       de camadas × (seletor de peça + paleta de cores), e hoje são 5
@@ -809,6 +968,17 @@ Todos apareceram rodando, nenhum aparecia lendo o código:
 - **Rodar antes de afirmar.** Vários bugs deste projeto só apareceram no
   teste: a cabeça cortada ao andar, o balão de fala saindo uma letra por
   linha, o painel que abria vazio. Nenhum aparecia lendo o código.
+- **⚠ Aba escondida congela o projeto inteiro, e parece bug.** Com
+  `document.hidden === true` o navegador **não dispara nenhum**
+  `requestAnimationFrame` — medido nesta sessão: 0 quadros em 5,6s. Como
+  o laço de animação é o coração da sala, tudo para junto: o boneco não
+  anda mesmo com a tecla apertada, a caminhada não troca de quadro, os
+  balões não somem. De fora é indistinguível de "a caminhada quebrou". Se
+  você está testando por automação com o painel do navegador fechado ou
+  não exibido, **presuma isso antes de investigar qualquer coisa que se
+  mexe**. A saída é exibir o painel; se não der, chamar as funções de
+  desenho quadro a quadro e ler os pixels do canvas — verifica a
+  composição, mas não a animação.
 - **Cache do navegador em `file://` e no preview engana.** Já aconteceu de
   edição de CSS parecer não ter efeito. Forçar render limpo antes de concluir
   que algo não funcionou.

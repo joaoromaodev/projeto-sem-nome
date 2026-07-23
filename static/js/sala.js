@@ -325,11 +325,9 @@ addEventListener("keyup", (e) => {
 addEventListener("blur", () => teclas.clear());
 
 chao.addEventListener("click", (e) => {
-  // Clicar na TV é mexer no vídeo, não mandar o boneco atravessar a sala
-  // até ela. O sofá é o contrário — lá o clique atravessa de
-  // propósito (`pointer-events: none`), porque ir até o móvel é
-  // exatamente o que se espera de quem clica nele.
-  if (e.target.closest("#tv")) return;
+  // Clicar na jukebox é mexer no som (ou liberar o áudio), não mandar o
+  // boneco atravessar a sala até ela.
+  if (e.target.closest("#jukebox")) return;
 
   const r = chao.getBoundingClientRect();
   alvo = {
@@ -340,20 +338,21 @@ chao.addEventListener("click", (e) => {
 
 /* ------------------------------------------------------- decoração
  *
- * A TV e o sofá tinham posição fixa no CSS. Agora são estado da sala:
- * vêm do servidor, valem pra todo mundo e ficam gravadas — que é o que
- * separa "cenário" de "decoração".
+ * O móvel tinha posição fixa no CSS. Agora é estado da sala: vem do
+ * servidor, vale pra todo mundo e fica gravado — que é o que separa
+ * "cenário" de "decoração".
  *
- * Arrastar só funciona no **modo decorar**, ligado por um botão. Não é
- * cerimônia: fora dele o sofá deixa o clique passar (`pointer-events:
- * none`) justamente pra mandar o boneco andar até ele, que é a reação
- * esperada de quem clica num sofá. Se o móvel capturasse o ponteiro o
- * tempo todo, mover a mobília custaria o passeio — e o passeio é a parte
- * que a galera gostou.
+ * Arrastar só funciona no **modo decorar**, ligado por um botão. Fora
+ * dele o clique na jukebox é play/pause, não arrasto: se o móvel pudesse
+ * ser empurrado a qualquer momento, mexer no som viraria mover a mobília
+ * por acidente.
+ *
+ * Hoje só existe um móvel decorável (a jukebox). A lista continua sendo
+ * lista de propósito — o dia em que entrar um segundo, nada aqui muda.
  */
 
-const MOVEIS = ["tv", "sofa"];
-let moveis = { tv: { x: 50, y: 52 }, sofa: { x: 50, y: 14 } };
+const MOVEIS = ["jukebox"];
+let moveis = { jukebox: { x: 50, y: 52 } };
 let decorando = false;
 
 function posicionarMovel(qual) {
@@ -376,7 +375,7 @@ function modoDecorar(ligado) {
   decorando = ligado;
   chao.classList.toggle("decorando", ligado);
   $("#decorar").textContent = ligado ? "pronto" : "decorar";
-  if (ligado) sistema("modo decorar: arraste a TV e o sofá pra onde quiser");
+  if (ligado) sistema("modo decorar: arraste a jukebox pra onde quiser");
 }
 
 $("#decorar").onclick = () => modoDecorar(!decorando);
@@ -746,7 +745,6 @@ let ultimoEstado = null;
 async function garantirPlayer() {
   if (playerMontado) return;
   playerMontado = true;
-  $("#semvideo").hidden = true;
   await video.montarPlayer($("#player"), {
     enviar: (msg) => enviar(msg),
     carregando: () => estadoVideo("carregando..."),
@@ -757,6 +755,36 @@ async function garantirPlayer() {
 function estadoVideo(txt) {
   $("#estadovideo").textContent = txt;
   $("#estadovideo").title = txt;
+  acenderJukebox();
+  pintarLiberar();
+}
+
+/* A jukebox acende quando tem som rolando de verdade.
+ *
+ * Sai do mesmo `ultimoEstado` que a linha de texto em vez de ter um
+ * liga/desliga próprio — duas fontes de verdade pra "está tocando?"
+ * acabam discordando, e aí o móvel fica aceso com a sala em silêncio.
+ * Mesma regra que já vale pro balão e a linha de "está digitando".
+ *
+ * Isso importa mais do que parece agora que não existe tela: o aceso é o
+ * ÚNICO sinal no chão de que a sala está tocando alguma coisa. */
+function acenderJukebox() {
+  const aceso = !!(ultimoEstado && ultimoEstado.id
+                   && ultimoEstado.tocando && video.estaLiberado());
+  $("#jukebox").classList.toggle("tocando", aceso);
+}
+
+/* O aviso de "clique pra soltar o som" também sai do estado, não de quem
+   lembrou de escondê-lo.
+   Antes ele era ligado e desligado na mão, e havia DOIS caminhos que
+   liberam o áudio: o clique no aviso e colar um link (colar já é gesto do
+   usuário, então pedir clique de novo seria pedir duas vezes). Só o
+   primeiro escondia o aviso — então quem colava um link com o aviso na
+   tela ficava com ele pendurado pra sempre, por cima da jukebox, com o
+   som já tocando por trás. Derivando dá uma resposta só. */
+function pintarLiberar() {
+  const precisa = !!(ultimoEstado && ultimoEstado.id) && !video.estaLiberado();
+  $("#liberar").hidden = !precisa;
 }
 
 /* Reescreve a linha do vídeo com o que sabemos agora. Existe separado
@@ -781,8 +809,7 @@ async function mostrarVideo(est) {
   // Sem o gesto do usuário o navegador barra o áudio. A tela de clique é
   // requisito do navegador, não escolha de design.
   if (!video.estaLiberado()) {
-    $("#liberar").hidden = false;
-    estadoVideo("clique no telão pra entrar");
+    estadoVideo("clique na jukebox pra ouvir");   // já pinta o aviso
     return;
   }
   video.aplicar(est);
@@ -790,9 +817,9 @@ async function mostrarVideo(est) {
 }
 
 $("#liberar").onclick = async () => {
-  $("#liberar").hidden = true;
   await garantirPlayer();
   video.liberarAudio();
+  pintarLiberar();
   if (ultimoEstado) video.aplicar(ultimoEstado);
   estadoVideo("entrou");
 };
@@ -808,7 +835,7 @@ function porVideo() {
   $("#link").value = "";
   // Quem cola o link está interagindo com a página: o gesto de autoplay
   // já vale, então não faz sentido pedir clique de novo pra essa pessoa.
-  garantirPlayer().then(() => video.liberarAudio());
+  garantirPlayer().then(() => { video.liberarAudio(); pintarLiberar(); });
 }
 
 $("#poriVideo").onclick = porVideo;

@@ -134,7 +134,7 @@ class Room:
         # sem sala não teria pra onde ir.
         self.privada = bool(linha["privada"]) and not self.eh_lobby
         self.convite = linha["convite"] or ""
-        self.moveis = self._ler_moveis(linha["moveis"])
+        self.moveis = self._ler_moveis(self.code, linha["moveis"])
 
         # O controle remoto é um objeto da sala, não um cargo. Ou está na
         # mão de alguém (`controle` = uid), ou está caído no chão numa
@@ -149,20 +149,43 @@ class Room:
 
     # ---------------------------------------------------------- móveis
 
-    # Onde a TV e o sofá ficam numa sala que ninguém decorou. São os
-    # mesmos números que estavam fixos no CSS — a sala nova continua
-    # abrindo exatamente como abria antes de existir decoração.
-    MOVEIS_PADRAO = {"tv": {"x": 50.0, "y": 52.0}, "sofa": {"x": 50.0, "y": 14.0}}
+    # Onde a jukebox fica numa sala que ninguém decorou. É a mesma posição
+    # que a TV ocupava, porque é o mesmo papel: o móvel que toca.
+    #
+    # A TV e o sofá saíram (ver a decisão "A sala ouve, não assiste"). Não
+    # precisou de remendo no banco pra isso: `_ler_moveis` percorre as
+    # chaves de MOVEIS_PADRAO e só lê do JSON as que existem hoje, então a
+    # posição antiga de `tv`/`sofa` gravada numa sala velha é simplesmente
+    # ignorada. Móvel que não existe mais não vira lixo, vira silêncio.
+    MOVEIS_PADRAO = {"jukebox": {"x": 50.0, "y": 52.0}}
+
+    # Sala com cenário tem o chão ocupado, e aí o meio deixa de ser um bom
+    # lugar. No escritório a ilha de mesas cobre exatamente a faixa do
+    # meio: a jukebox nascia 82% enterrada atrás de um monitor, e como o
+    # clique nela é o que libera o áudio (requisito do navegador), móvel
+    # escondido não é só feio — é a sala muda.
+    #
+    # Foi o mesmo problema que já tinha comido a TV. **A lição é que o
+    # cenário precisa dizer onde o móvel nasce**, senão todo cenário novo
+    # reencontra este bug sozinho.
+    MOVEIS_POR_SALA = {
+        "escritorio": {"jukebox": {"x": 87.0, "y": 20.0}},   # canto livre à direita
+    }
 
     @classmethod
-    def _ler_moveis(cls, cru: str) -> dict:
+    def _ler_moveis(cls, code: str, cru: str) -> dict:
         """Lê o JSON da coluna, caindo no padrão a qualquer sinal de lixo.
 
         Sala sem decoração tem a coluna vazia, que é o caso comum e não é
         erro. Mas um JSON quebrado também não pode derrubar a sala inteira
         — móvel fora do lugar é chato, sala que não abre é fatal.
+
+        O padrão pode ser específico da sala quando ela tem cenário (ver
+        MOVEIS_POR_SALA). Isso só vale pra sala nova: quem já arrastou tem
+        posição gravada, e ela ganha.
         """
-        moveis = {k: dict(v) for k, v in cls.MOVEIS_PADRAO.items()}
+        padrao = cls.MOVEIS_POR_SALA.get(code, cls.MOVEIS_PADRAO)
+        moveis = {k: dict(v) for k, v in padrao.items()}
         try:
             salvo = json.loads(cru) if cru else {}
         except Exception:

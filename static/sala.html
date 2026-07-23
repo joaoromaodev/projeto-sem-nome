@@ -13,7 +13,8 @@
   .topo { display: flex; gap: 8px; flex: 1; min-height: 0; }
   .esquerda { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   /* A coluna da direita é só o histórico de conversa, de cima a baixo. O
-     telão saiu daqui (virou a TV do cenário) e a lista de "quem tá aqui"
+     telão saiu daqui (e depois sumiu de vez: virou a jukebox, que só toca
+     o áudio — ver a decisão travada) e a lista de "quem tá aqui"
      virou um contador na barra da sala — nome por nome era informação que
      o próprio chão já dá, já que os bonecos estão todos à vista. */
   .direita { width: 260px; flex: none; display: flex; flex-direction: column; }
@@ -51,93 +52,91 @@
      outro. */
   #chao { --movel: 1; }
 
-  #tv, #sofa {
+  /* A jukebox. Estes dois números são o tamanho nativo do PNG — trocar a
+     arte por uma de outro tamanho é mexer aqui e mais nada. */
+  #chao { --juke-l: 48px; --juke-a: 62px; }
+
+  #jukebox {
     position: absolute;
     transform: translateX(-50%);
+    width:  calc(var(--juke-l) * var(--movel));
+    height: calc(var(--juke-a) * var(--movel));
+  }
+  /* A arte é uma CAMADA POR CIMA, não o fundo do #jukebox. Precisa ser
+     assim porque o iframe é filho: filho com `z-index` negativo pinta
+     acima do *fundo* do pai (a ordem de pintura da CSS põe o fundo do
+     elemento que abre o contexto de empilhamento antes de tudo), então
+     com a arte no `background` o vídeo apareceria por cima dela — que é
+     exatamente o que esta mudança existe pra impedir. Como camada
+     irmã com z-index maior, ela tapa de verdade. */
+  #jukebox::after {
+    content: ""; position: absolute; inset: 0; z-index: 2;
+    background: url("/moveis/jukebox.png") no-repeat center / 100% 100%;
     image-rendering: pixelated;
-    background-repeat: no-repeat;
-    background-size: 100% 100%;
-  }
-  #tv {
-    width: calc(80px * var(--movel)); height: calc(80px * var(--movel));
-    background-image: url("/moveis/tv.png");
-  }
-  /* 128×40: a arte original comportava 2 pessoas, e foi alargada
-     repetindo a faixa do meio até caber 3 bonecos lado a lado. */
-  #sofa {
-    width: calc(128px * var(--movel)); height: calc(40px * var(--movel));
-    background-image: url("/moveis/sofa.png");
-    /* Clique atravessa: mandar o boneco andar até o sofá é a reação
-       esperada de quem clica nele. Sentar fica pra quando existir. */
     pointer-events: none;
   }
+  /* Tocando, o neon da jukebox acende. É o único sinal visual que sobrou
+     de "tem som rolando" agora que não existe tela — sem ele o móvel fica
+     idêntico parado e tocando, e a sala não sabe se está ligada. */
+  #jukebox.tocando::after { filter: brightness(1.18) saturate(1.3); }
 
   /* Posição e profundidade dos móveis vêm do JS, não daqui.
      Eles deixaram de ser cenário e viraram decoração: a posição é estado
      da sala, mora no banco e vale pra todo mundo. O z-index segue a mesma
      regra dos bonecos (1000 − y×10) — quem está mais pra baixo na tela
-     cobre quem está atrás —, e é o JS que a aplica, senão arrastar a TV
-     pra frente do sofá não mudaria quem tapa quem.
+     cobre quem está atrás —, e é o JS que a aplica, senão arrastar a
+     jukebox pra frente de alguém não mudaria quem tapa quem.
 
-     Os valores que estavam aqui (tv 52%, sofá 14%) continuam existindo,
-     mas como `MOVEIS_PADRAO` no servidor: é lá que uma sala nova nasce
-     arrumada. */
+     A posição inicial vive em `MOVEIS_PADRAO` no servidor: é lá que uma
+     sala nova nasce arrumada. */
 
   /* ---- modo decorar ----
-     Fora dele o sofá deixa o clique passar de propósito, pra clicar nele
-     mandar o boneco andar até lá. Ligado, os móveis capturam o ponteiro
-     pra poderem ser arrastados — e ganham contorno tracejado, porque um
-     modo que muda o que o clique faz precisa aparecer na tela. */
-  #chao.decorando #tv,
-  #chao.decorando #sofa {
-    pointer-events: auto;
+     Ligada, a jukebox captura o ponteiro pra poder ser arrastada — e ganha
+     contorno tracejado, porque um modo que muda o que o clique faz precisa
+     aparecer na tela. */
+  #chao.decorando #jukebox {
     cursor: grab;
     outline: 1px dashed rgba(255,255,255,.75);
     outline-offset: 2px;
   }
   #chao.decorando .pegando { cursor: grabbing; opacity: .8; }
-  /* Enquanto decora, o vídeo não recebe clique: arrastar a TV não pode
-     virar play/pause por acidente. */
-  #chao.decorando #moldura { pointer-events: none; }
+  /* Enquanto decora, o player não recebe clique: arrastar a jukebox não
+     pode virar play/pause por acidente. */
+  #chao.decorando #moldura,
+  #chao.decorando #liberar { pointer-events: none; }
 
-  /* ---- vídeo, dentro do buraco da TV ----
-     O buraco é transparente no PNG, então o vídeo fica ATRÁS da moldura e
-     aparece por ele — sem máscara, sem recorte. Estes quatro números são
-     as coordenadas do buraco no sprite de 80×80, não valores escolhidos:
-     x=17 y=28, 46 de largura por 30 de altura. */
+  /* ---- o player, escondido atrás da jukebox ----
+     Aqui a sala OUVE. O iframe fica atrás do móvel (z-index negativo em
+     relação a ele) e nunca é visto. Mas continua sendo um elemento com
+     tamanho de verdade e renderizado: `display:none` ou 0×0 fazem o
+     YouTube estrangular a reprodução, e o sintoma é som que não começa
+     sem erro nenhum no console. Ele é pequeno porque não precisa ser
+     grande, não porque o tamanho importe. */
   #moldura {
     position: absolute;
-    left:   calc(17px * var(--movel));
-    top:    calc(28px * var(--movel));
-    width:  calc(46px * var(--movel));
-    height: calc(30px * var(--movel));
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px; height: 24px;   /* menor que o corpo opaco da arte */
+    z-index: 1;
     background: #000; overflow: hidden;
+    pointer-events: none;
   }
   #moldura iframe { display: block; width: 100%; height: 100%; border: 0; }
   /* A tela de gesto: sem um clique do usuário o navegador barra o áudio.
      Não é enfeite, é requisito do navegador. */
+  /* O gesto de liberar o áudio. Fica POR CIMA da jukebox inteira (z-index
+     acima da arte), porque agora não existe tela onde encostar — o móvel
+     todo é o botão. Sem um clique do usuário o navegador barra o som:
+     não é enfeite, é requisito do navegador. */
   #liberar {
     position: absolute; inset: 0; z-index: 5;
     display: flex; flex-direction: column;
-    align-items: center; justify-content: center; gap: 8px;
-    background: rgba(10,8,16,.88); color: #fff;
-    cursor: pointer; text-align: center; padding: 12px;
+    align-items: center; justify-content: center; gap: 2px;
+    background: rgba(10,8,16,.86); color: #fff;
+    cursor: pointer; text-align: center; padding: 4px;
   }
-  #liberar b { font-size: 15px; }
-  #liberar span { font-size: 11px; color: #c8c0d8; }
-  /* TV desligada: a tela verde. O PNG já vem recortado no tamanho exato
-     do buraco, então é só esticar — sem deslocamento pra acertar. */
-  #semvideo {
-    position: absolute; inset: 0; display: flex;
-    align-items: flex-end; justify-content: center;
-    text-align: center; padding: 8px;
-    background: url("/moveis/tv-verde.png") no-repeat center / 100% 100%;
-    image-rendering: pixelated;
-  }
-  #semvideo span {
-    font-size: 11px; color: #14361f;
-    background: rgba(255,255,255,.5); padding: 2px 6px;
-  }
+  #liberar b { font-size: 12px; }
+  #liberar span { font-size: 9px; color: #c8c0d8; line-height: 1.15; }
   #link { width: 190px; flex: none; min-width: 0; }
   /* Uma linha só. Desde que aqui aparece o título e não mais a palavra
      "tocando", o texto passou a ter tamanho imprevisível — sem isto um
@@ -148,9 +147,11 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  /* Escudo sobre o iframe pra quem não está com o controle. Sem ele, os
-     controles nativos do YouTube deixariam qualquer um dar play e pause
-     direto no iframe, passando por cima do controle remoto. */
+  /* Escudo sobre a jukebox pra quem não está com o controle.
+     Com o player escondido atrás da arte ele ficou **redundante contra o
+     YouTube** — ninguém alcança os controles nativos de um iframe tapado.
+     Mas continua servindo pra outra coisa, que é o motivo de ter ficado:
+     dizer, com o cursor, que aquele móvel não é seu pra mexer agora. */
   #escudo {
     position: absolute; inset: 0; z-index: 4;
     background: transparent; cursor: not-allowed;
@@ -323,20 +324,22 @@
         <div id="chao">
           <div class="dica">setas ou WASD pra andar &nbsp;·&nbsp; clique no chão pra ir até lá</div>
 
-          <!-- Os móveis da sala. A TV é o telão: o vídeo mora dentro do
-               buraco dela, que é transparente no PNG. -->
-          <div id="tv">
-            <div id="moldura">
+          <!-- A jukebox: o móvel que toca. O vídeo do YouTube roda ATRÁS
+               dela, escondido de propósito — aqui a sala ouve, não assiste
+               (ver a decisão travada "A sala ouve, não assiste"). O iframe
+               continua sendo um elemento de verdade, com tamanho e
+               renderizado, porque player escondido com `display:none` o
+               YouTube estrangula. Ele só não é visível. -->
+          <div id="jukebox">
+            <div id="moldura" aria-hidden="true">
               <div id="player"></div>
-              <div id="semvideo"><span>cole um link do YouTube</span></div>
-              <div id="escudo" title="quem está com o controle remoto manda no vídeo"></div>
-              <div id="liberar" hidden>
-                <b>▶ clique pra entrar</b>
-                <span>o navegador não deixa o som começar sozinho</span>
-              </div>
+            </div>
+            <div id="escudo" title="quem está com o controle remoto manda no som"></div>
+            <div id="liberar" hidden>
+              <b>▶ clique</b>
+              <span>pra soltar o som</span>
             </div>
           </div>
-          <div id="sofa"></div>
 
           <!-- painel de editar o boneco, flutuando sobre a sala -->
           <div class="win" id="painel" hidden>
