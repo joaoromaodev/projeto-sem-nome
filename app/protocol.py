@@ -296,13 +296,69 @@ class VideoFimIn(BaseModel):
     type: Literal["video_fim"]
 
 
+# ------------------------------------------------------ tela (screen-share)
+# O servidor aqui é só carteiro: quem compartilha a tela abre uma conexão
+# WebRTC direta com cada quem assiste, e a "conversa" pra montar essa conexão
+# (oferta, resposta, candidatos de rede) precisa de um canal — que é este
+# WebSocket. O conteúdo dessa conversa (`dados`) é opaco pro servidor: ele só
+# entrega pra pessoa certa. O vídeo em si nunca passa por aqui.
+
+UID_RE = re.compile(r"^[0-9a-f]{8}$")   # uuid4().hex[:8], como em main.py
+
+# Teto do blob de sinalização. Uma oferta SDP com vídeo vive na casa dos
+# poucos KB; candidatos ICE são minúsculos. 16KB dá folga larga e ainda
+# barra alguém tentando usar o relay pra empurrar payload grande pra sala.
+SINAL_MAX = 16384
+
+
+class TelaIniciarIn(BaseModel):
+    """"Estou compartilhando minha tela agora." Só um por sala."""
+
+    type: Literal["tela_iniciar"]
+
+
+class TelaPararIn(BaseModel):
+    """"Parei de compartilhar." Também dispara sozinho quando quem assiste sai."""
+
+    type: Literal["tela_parar"]
+
+
+class TelaSinalIn(BaseModel):
+    """Um recado de sinalização WebRTC pra UMA pessoa da sala.
+
+    `para` é o uid do destinatário; `dados` é o blob opaco (oferta, resposta
+    ou candidato). O servidor não olha dentro — só reencaminha pra `para`,
+    carimbando de quem veio.
+    """
+
+    type: Literal["tela_sinal"]
+    para: str
+    dados: dict
+
+    @field_validator("para")
+    @classmethod
+    def _para(cls, v: str) -> str:
+        if not isinstance(v, str) or not UID_RE.match(v):
+            raise ValueError("destinatário inválido")
+        return v
+
+    @field_validator("dados")
+    @classmethod
+    def _dados(cls, v: dict) -> dict:
+        import json as _json
+        if len(_json.dumps(v)) > SINAL_MAX:
+            raise ValueError("blob de sinalização grande demais")
+        return v
+
+
 IncomingT = (ChatIn | MoveIn | AvatarIn | NickIn | PingIn
              | DigitandoIn | BuzinaIn
              | VideoPorIn | VideoPlayIn | VideoPauseIn | VideoSeekIn
              | VideoFimIn | VideoPularIn
              | FilaPorIn | FilaTirarIn
              | ControlePegarIn | ControleSoltarIn
-             | FavoritarIn | MovelIn)
+             | FavoritarIn | MovelIn
+             | TelaIniciarIn | TelaPararIn | TelaSinalIn)
 
 
 class Incoming(BaseModel):

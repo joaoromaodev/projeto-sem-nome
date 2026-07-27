@@ -122,6 +122,14 @@
     pointer-events: none;
   }
   #moldura iframe { display: block; width: 100%; height: 100%; border: 0; }
+  /* A tela compartilhada preenche o telão por cima do iframe. `contain` pra
+     não cortar nada — a tela de quem compartilha pode ter proporção
+     diferente do telão. */
+  #telaVideo {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: contain; background: #000; z-index: 2;
+  }
+  #telaVideo[hidden] { display: none; }
   /* A tela de gesto: sem um clique do usuário o navegador barra o áudio.
      Não é enfeite, é requisito do navegador. */
   /* O gesto de liberar o áudio. Fica POR CIMA da jukebox inteira (z-index
@@ -210,6 +218,24 @@
   }
   /* Enquanto decora, arrastar não pode virar clique no botão. */
   #chao.decorando #telaCheia { pointer-events: none; }
+
+  /* Botão de compartilhar tela: como o de tela cheia, só existe no cinema e
+     fica acima do escudo pra qualquer um clicar. Canto superior esquerdo. */
+  #compartilhar { display: none; }
+  #chao.cinema #compartilhar {
+    display: block; position: absolute; z-index: 6;
+    left: 6px; top: 6px; padding: 3px 8px;
+    font-size: 11px; cursor: pointer;
+    background: rgba(10,8,16,.6); color: #fff;
+    border: 1px solid rgba(255,255,255,.4);
+    opacity: .75; transition: opacity .15s;
+  }
+  #chao.cinema #compartilhar:hover { opacity: 1; }
+  /* Transmitindo: fica vermelho, como um "gravando/no ar". */
+  #chao.cinema #compartilhar.no-ar {
+    background: #b02020; opacity: 1; border-color: #e06060;
+  }
+  #chao.decorando #compartilhar { pointer-events: none; }
 
   .botoes { display: flex; gap: 4px; }
   .botoes button { padding: 4px 8px; font-size: 12px; }
@@ -387,6 +413,9 @@
           <div id="jukebox">
             <div id="moldura" aria-hidden="true">
               <div id="player"></div>
+              <!-- A tela compartilhada (WebRTC) entra aqui, POR CIMA do
+                   player do YouTube. Fica escondido até chegar um stream. -->
+              <video id="telaVideo" autoplay playsinline hidden></video>
             </div>
             <div id="escudo" title="quem está com o controle remoto manda no som"></div>
             <!-- Tela cheia é individual, como o volume: não passa pelo servidor
@@ -396,6 +425,11 @@
                  por padrão, `block` só no .cinema). O `hidden` do HTML vence o
                  display do autor e o botão nunca apareceria nem no cinema. -->
             <button id="telaCheia" type="button" title="tela cheia">⛶</button>
+            <!-- Compartilhar a própria tela na sala. Só no cinema, e acima do
+                 escudo pra qualquer um poder (não exige o controle remoto,
+                 igual a pôr vídeo na fila). -->
+            <button id="compartilhar" type="button"
+                    title="compartilhar sua tela na sala">🖥 compartilhar</button>
             <div id="liberar" hidden>
               <b>▶ clique</b>
               <span>pra soltar o som</span>

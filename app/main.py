@@ -19,6 +19,7 @@ from . import db, titulos
 from .protocol import (Avatar, AvatarIn, BuzinaIn, ChatIn, ControlePegarIn,
                        ControleSoltarIn, DigitandoIn, FavoritarIn, FilaPorIn,
                        FilaTirarIn, MoveIn, MovelIn, NickIn, PingIn, Pos,
+                       TelaIniciarIn, TelaPararIn, TelaSinalIn,
                        VideoFimIn, VideoPauseIn, VideoPlayIn, VideoPorIn,
                        VideoPularIn, VideoSeekIn, ev, limpar_nick, parse)
 from .rooms import LOBBY, User, Video, manager
@@ -640,6 +641,9 @@ async def ws_sala(ws: WebSocket, code: str):
             # faltar chega pelo `titulos` logo em seguida.
             titulos=_titulos_conhecidos(room.video.id, *room.fila),
             controle=room.controle_estado(),
+            # Se já tem alguém compartilhando a tela, quem chega precisa saber
+            # pra pedir o stream — senão só veria o telão dos outros aceso.
+            tela=room.tela,
         ))
         await room.broadcast(ev("entrou", user=user.publico()), exceto=uid)
         _pedir_titulos(room, room.video.id, *room.fila)
@@ -817,6 +821,42 @@ async def ws_sala(ws: WebSocket, code: str):
                         exceto=uid,
                     )
 
+            # ----------------------------------------------------- tela
+            # O servidor é só carteiro do WebRTC: guarda quem está
+            # compartilhando e reencaminha os recados de sinalização. O
+            # vídeo em si vai direto de um navegador pro outro, nunca por
+            # aqui.
+
+            elif isinstance(msg, TelaIniciarIn):
+                if room.tela and room.tela != uid:
+                    dono = room.users.get(room.tela)
+                    await ws.send_json(ev(
+                        "aviso",
+                        texto=f"{dono.nick if dono else 'alguém'} já está "
+                              "compartilhando a tela",
+                    ))
+                    continue
+                room.tela = uid
+                # Pros outros: cada um responde pedindo o stream (o cliente
+                # cuida). Quem compartilha não precisa do aviso — foi ele.
+                await room.broadcast(
+                    ev("tela_ligou", de=uid, nick=user.nick), exceto=uid
+                )
+
+            elif isinstance(msg, TelaPararIn):
+                # Só quem está compartilhando derruba a própria tela. Sem
+                # esta checagem, um espectador mandaria parar a de outro.
+                if room.tela == uid:
+                    room.tela = ""
+                    await room.broadcast(ev("tela_desligou", de=uid))
+
+            elif isinstance(msg, TelaSinalIn):
+                # Reencaminha o blob opaco pra quem é. Carimba de quem veio
+                # pra o outro lado saber com quem está falando.
+                await room.enviar_para(
+                    msg.para, ev("tela_sinal", de=uid, dados=msg.dados)
+                )
+
             elif isinstance(msg, VideoFimIn):
                 # Chega uma vez por pessoa; a sala trata só a primeira.
                 # Não exige controle: é o player avisando um fato, não
@@ -836,13 +876,18 @@ async def ws_sala(ws: WebSocket, code: str):
     finally:
         if user is not None:
             tinha_controle = room.controle == uid
-            await room.remove(uid)   # derruba o controle no chão, se tinha
+            transmitia = room.tela == uid
+            await room.remove(uid)   # derruba o controle e a tela, se tinha
             await room.broadcast(ev("saiu", uid=uid, nick=user.nick))
             if tinha_controle:
                 await room.broadcast(ev(
                     "controle", **room.controle_estado(), nick="",
                     caiu=user.nick,
                 ))
+            # Quem fechou a aba transmitindo deixa a sala com um telão morto.
+            # Avisar aqui é o que faz o vídeo dos outros sumir na hora.
+            if transmitia:
+                await room.broadcast(ev("tela_desligou", de=uid))
 
 
 class EstaticoSemCache(StaticFiles):

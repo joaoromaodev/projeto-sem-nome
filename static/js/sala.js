@@ -14,6 +14,7 @@ import { api } from "./api.js";
 import { montarPainel } from "./editor.js";
 import { montarCenario } from "./cenario.js";
 import * as video from "./video.js";
+import * as tela from "./tela.js";
 
 const $ = (s) => document.querySelector(s);
 const chao = $("#chao");
@@ -849,6 +850,66 @@ function pintarTelaCheia() {
 document.addEventListener("fullscreenchange", pintarTelaCheia);
 document.addEventListener("webkitfullscreenchange", pintarTelaCheia);
 
+/* ---------------------------------------------------- tela compartilhada
+   O tela.js cuida do WebRTC; aqui só ligamos ele à tela e ao botão. */
+
+tela.montar({
+  envia: (msg) => enviar(msg),
+  mostra: mostrarTela,
+  mudou: pintarCompartilhar,
+});
+
+/* Mostra (ou limpa) o stream no telão. `null` volta pro YouTube. */
+function mostrarTela(stream) {
+  const v = $("#telaVideo");
+  if (stream) {
+    v.srcObject = stream;
+    v.hidden = false;
+    // Quem transmite vê o próprio preview MUDO de propósito: o som real ele
+    // já ouve da fonte (a aba/janela capturada), e tocar de novo aqui daria
+    // eco. Quem assiste é que quer o som.
+    // Fora isso, autoplay com som pode ser barrado; se for, cai pra mudo e o
+    // clique no telão solta o som (o navegador libera no gesto).
+    v.muted = tela.euSouFonte();
+    v.play().catch(() => { v.muted = true; v.play().catch(() => {}); });
+  } else {
+    v.srcObject = null;
+    v.hidden = true;
+  }
+  pintarCompartilhar();
+}
+
+// Clicar no telão durante uma transmissão tenta soltar o som (caso o
+// autoplay tenha entrado mudo).
+$("#telaVideo").onclick = () => {
+  // Só pra quem assiste: o preview de quem transmite fica mudo de propósito
+  // (senão, eco). Destravar o som é gesto de espectador.
+  if (tela.euSouFonte()) return;
+  const v = $("#telaVideo");
+  if (v.muted) { v.muted = false; v.play().catch(() => {}); }
+};
+
+function pintarCompartilhar() {
+  const b = $("#compartilhar");
+  const meu = tela.euSouFonte();
+  b.textContent = meu ? "⏹ parar" : "🖥 compartilhar";
+  b.classList.toggle("no-ar", meu);
+}
+
+$("#compartilhar").onclick = async () => {
+  if (tela.euSouFonte()) { tela.parar(); return; }
+  try {
+    await tela.comecar();
+    sistema("você está compartilhando sua tela");
+  } catch (e) {
+    // O caso comum é a pessoa fechar o seletor "escolha a janela". Não é
+    // erro que mereça alarde.
+    if (e && e.name !== "NotAllowedError") {
+      sistema("não consegui compartilhar a tela");
+    }
+  }
+};
+
 function porVideo() {
   const v = $("#link").value.trim();
   if (!v) return $("#link").focus();
@@ -1395,6 +1456,9 @@ function receber(m) {
       pintarFavoritos();
       pintarMoveis();
       pintarTranca();
+      // Se entrei numa sala que já tinha alguém compartilhando a tela,
+      // peço o stream. Se não, isto não faz nada.
+      tela.aoEntrar(m.tela || "");
       if (salaPrivada) {
         sistema(souDono
           ? "esta sala está trancada — só entra quem tem o seu convite"
@@ -1470,6 +1534,21 @@ function receber(m) {
       filaAtual = m.fila || [];
       pintarFila();
       if (m.novo && m.por) sistema(`${m.por} pôs um vídeo na fila`);
+      break;
+
+    // ---- tela compartilhada (WebRTC). O sala.js é só o mensageiro entre
+    // o WebSocket e o tela.js, que cuida da conexão de verdade. ----
+    case "tela_ligou":
+      sistema(`${m.nick} está compartilhando a tela`);
+      tela.ligou(m.de);
+      break;
+
+    case "tela_desligou":
+      tela.desligou(m.de);
+      break;
+
+    case "tela_sinal":
+      tela.sinal(m.de, m.dados);
       break;
 
     // Os títulos chegam soltos, depois do vídeo. Só repintamos rótulo —

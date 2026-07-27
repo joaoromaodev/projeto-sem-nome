@@ -145,6 +145,12 @@ class Room:
         # Quando cada buzina recente tocou. Ver `buzinar`.
         self.buzinas: list[float] = []
 
+        # Quem está compartilhando a tela agora (uid), ou "". Só um por vez:
+        # a sala tem um telão, e dois streams disputando ele seria confusão.
+        # Mora em memória junto com a presença — é estado de agora, morre com
+        # a saída da pessoa, nunca vai pro banco.
+        self.tela: str = ""
+
         self._lock = asyncio.Lock()
 
     # ---------------------------------------------------------- móveis
@@ -384,7 +390,19 @@ class Room:
         # ficaria sem ninguém podendo mexer no vídeo — travada de vez.
         if saiu is not None and self.controle == uid:
             self.soltar_controle(uid, saiu.pos)
+        # Quem estava compartilhando a tela e fechou a aba leva o stream
+        # junto: sem isto a sala ficaria com um telão apontando pra uma
+        # conexão morta. Quem avisa a sala é o `finally` do endpoint.
+        if saiu is not None and self.tela == uid:
+            self.tela = ""
         return saiu
+
+    async def enviar_para(self, uid: str, msg: dict) -> None:
+        """Manda pra uma pessoa só. É o relay da sinalização do screen-share:
+        cada recado de WebRTC tem um destinatário, não vai pra sala toda."""
+        alvo = self.users.get(uid)
+        if alvo is not None:
+            await self._send(alvo, msg)
 
     async def broadcast(self, msg: dict, exceto: Optional[str] = None) -> None:
         """Manda pra todo mundo. Conexão morta é descartada em silêncio.
