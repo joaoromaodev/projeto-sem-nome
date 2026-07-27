@@ -170,6 +170,9 @@ class Room:
     # reencontra este bug sozinho.
     MOVEIS_POR_SALA = {
         "escritorio": {"jukebox": {"x": 87.0, "y": 20.0}},   # canto livre à direita
+        # No cinema o "jukebox" é o telão: nasce centrado e alto, pregado na
+        # parede do fundo, com as fileiras de sofá voltadas pra ele.
+        "cinema": {"jukebox": {"x": 50.0, "y": 50.0}},
     }
 
     @classmethod

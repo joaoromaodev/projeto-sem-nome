@@ -824,6 +824,31 @@ $("#liberar").onclick = async () => {
   estadoVideo("entrou");
 };
 
+/* Tela cheia do telão (só o cinema mostra o botão). É o #jukebox inteiro que
+ * vai pra tela cheia, e não só o iframe, pra o aviso de "clique pra liberar"
+ * continuar aparecendo por cima quando o som ainda não foi solto. Ajuste de
+ * quem assiste: não passa pelo servidor nem exige o controle remoto. */
+$("#telaCheia").onclick = () => {
+  const alvo = $("#jukebox");
+  const cheia = document.fullscreenElement || document.webkitFullscreenElement;
+  if (cheia) {
+    (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+  } else {
+    (alvo.requestFullscreen || alvo.webkitRequestFullscreen).call(alvo);
+  }
+};
+
+/* O ícone segue o estado real (o usuário pode sair com Esc, sem passar pelo
+ * botão), então derivamos do evento em vez de alternar na mão. */
+function pintarTelaCheia() {
+  const cheia = !!(document.fullscreenElement || document.webkitFullscreenElement);
+  const b = $("#telaCheia");
+  b.textContent = cheia ? "✕" : "⛶";
+  b.title = cheia ? "sair da tela cheia" : "tela cheia";
+}
+document.addEventListener("fullscreenchange", pintarTelaCheia);
+document.addEventListener("webkitfullscreenchange", pintarTelaCheia);
+
 function porVideo() {
   const v = $("#link").value.trim();
   if (!v) return $("#link").focus();

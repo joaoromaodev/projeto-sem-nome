@@ -141,6 +141,20 @@ label { user-select: none; }
 }
 #chao.escritorio:before { display: none; }
 
+/* Sala cinema: chão escuro de auditório com um corredor de carpete no meio,
+   e parede preta no lugar do azul. A ideia é que a única fonte de luz da
+   sala seja o telão (o "jukebox" restilizado pela classe .cinema no
+   sala.html), então tudo em volta é penumbra. */
+#chao.cinema {
+  background:
+    repeating-linear-gradient(90deg, #17171d 0 38px, #1e1e26 38px 40px),
+    #17171d;
+}
+#chao.cinema:before {
+  background: linear-gradient(#0a0a0f, #17171d);
+  height: 46%;
+}
+
 .pessoa {
   position: absolute;
   transform: translateX(-50%);

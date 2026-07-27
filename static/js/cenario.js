@@ -105,7 +105,32 @@ function escritorio() {
   return m;
 }
 
-const SALAS = { escritorio };
+/* Sala cinema: fileiras de sofás voltadas pro telão.
+ *
+ * O telão não é desenhado aqui — ele é o próprio player de vídeo (o mesmo
+ * "jukebox" das outras salas), que o CSS da classe `.cinema` reveste de
+ * moldura e faz aparecer grande na parede em vez de ficar escondido. Aqui
+ * só entram os sofás, que dão à sala a cara de sala de cinema.
+ *
+ * As fileiras vão da mais funda (perto do telão, y maior, sofás menores e
+ * mais juntos) à da frente (y menor, maiores e mais espalhados) — a
+ * perspectiva de um auditório num chão plano. Sem zIndex explícito de
+ * propósito: caindo na regra dos bonecos (quem está mais à frente cobre),
+ * uma pessoa se intercala com os sofás como se sentasse entre eles.
+ */
+function cinema() {
+  const m = [];
+  const sofa = (x, y, w) => m.push({ s: "/moveis/sofa", x, y, w });
+
+  // fundo -> frente. Cada fileira mais baixa é um pouco maior e mais aberta.
+  [34, 50, 66].forEach((x) => sofa(x, 40, 12));      // fileira do fundo
+  [28, 50, 72].forEach((x) => sofa(x, 27, 14));      // fileira do meio
+  [22, 50, 78].forEach((x) => sofa(x, 12, 16));      // fileira da frente
+
+  return m;
+}
+
+const SALAS = { escritorio, cinema };
 
 /** Desenha o cenário da sala no #chao, se houver um pra ela. Idempotente:
  *  limpa o que já tinha antes de redesenhar. */
@@ -121,7 +146,9 @@ export function montarCenario(chao, codigo) {
   for (const it of fn()) {
     const img = document.createElement("img");
     img.className = "movel";
-    img.src = OBJ + it.s + ".png";
+    // `s` que começa com "/" é caminho a partir de /static (ex.: o sofá vive
+    // em /moveis, não em /sprites/objetos como o resto).
+    img.src = (it.s[0] === "/" ? it.s : OBJ + it.s) + ".png";
     img.style.left = it.x + "%";
     img.style.bottom = it.y + "%";
     img.style.width = it.w + "%";

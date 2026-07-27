@@ -157,6 +157,60 @@
     background: transparent; cursor: not-allowed;
   }
 
+  /* ---- sala cinema: o "jukebox" vira telão ----
+     Mesma engrenagem de sempre (o vídeo roda dentro do #moldura, a posição
+     é estado da sala e continua arrastável no modo decorar), mas aqui a
+     sala ASSISTE em vez de só ouvir: a arte do móvel some e o player, que
+     nas outras salas fica 40×24 escondido atrás dela, passa a preencher
+     uma tela grande na parede.
+
+     Nada disso precisa de servidor nem de outro elemento: é o mesmo #player
+     de sempre, só revestido. Uma sala que não seja "cinema" ignora tudo
+     isto porque nada aqui casa sem a classe .cinema no #chao. */
+  #chao.cinema { --juke-l: 320px; --juke-a: 180px; }   /* telão 16:9 */
+  #chao.cinema #jukebox {
+    background: #000;
+    border: 3px solid #050507;
+    box-shadow: 0 0 0 4px #1a1a20, 0 10px 24px rgba(0,0,0,.6);
+  }
+  /* sem a arte da jukebox: aqui o telão é o próprio vídeo */
+  #chao.cinema #jukebox::after { display: none; }
+  /* o player deixa de ser o retângulo escondido e passa a preencher o telão */
+  #chao.cinema #moldura {
+    inset: 0; width: auto; height: auto; transform: none; z-index: 1;
+  }
+  /* tocando, a moldura ganha um halo azulado — tela ligada num quarto escuro */
+  #chao.cinema #jukebox.tocando {
+    box-shadow: 0 0 0 4px #1a1a20,
+                0 0 30px 6px rgba(120,150,255,.4),
+                0 10px 24px rgba(0,0,0,.6);
+  }
+  /* a tela de "clique pra liberar" cobre o telão inteiro, como uma cortina */
+  #chao.cinema #liberar b { font-size: 15px; }
+  #chao.cinema #liberar span { font-size: 11px; }
+
+  /* Botão de tela cheia: escondido por padrão, só existe no cinema. z-index
+     acima do escudo (4) e do liberar (5) pra receber clique de qualquer um —
+     tela cheia é ajuste de quem assiste, não do dono do controle. */
+  #telaCheia { display: none; }
+  #chao.cinema #telaCheia {
+    display: block; position: absolute; z-index: 6;
+    right: 6px; top: 6px; width: 26px; height: 22px; padding: 0;
+    font-size: 14px; line-height: 20px; text-align: center; cursor: pointer;
+    background: rgba(10,8,16,.6); color: #fff; border: 1px solid rgba(255,255,255,.4);
+    opacity: .55; transition: opacity .15s;
+  }
+  #chao.cinema #telaCheia:hover { opacity: 1; }
+  /* Em tela cheia o telão vira a tela toda; o botão fica maior e mais longe
+     da borda pra dar pra sair (o Esc também sai). */
+  #chao.cinema #jukebox:fullscreen { border: 0; box-shadow: none; }
+  #chao.cinema #jukebox:fullscreen #telaCheia {
+    right: 16px; top: 16px; width: 34px; height: 30px;
+    font-size: 18px; line-height: 28px;
+  }
+  /* Enquanto decora, arrastar não pode virar clique no botão. */
+  #chao.decorando #telaCheia { pointer-events: none; }
+
   .botoes { display: flex; gap: 4px; }
   .botoes button { padding: 4px 8px; font-size: 12px; }
   .botoes button:disabled { color: #808080; cursor: default; }
@@ -335,6 +389,13 @@
               <div id="player"></div>
             </div>
             <div id="escudo" title="quem está com o controle remoto manda no som"></div>
+            <!-- Tela cheia é individual, como o volume: não passa pelo servidor
+                 nem exige o controle remoto, então fica ACIMA do escudo (que
+                 tapa o resto pra quem não manda). Só aparece no cinema. -->
+            <!-- Sem o atributo `hidden`: quem esconde é o CSS (`display:none`
+                 por padrão, `block` só no .cinema). O `hidden` do HTML vence o
+                 display do autor e o botão nunca apareceria nem no cinema. -->
+            <button id="telaCheia" type="button" title="tela cheia">⛶</button>
             <div id="liberar" hidden>
               <b>▶ clique</b>
               <span>pra soltar o som</span>
