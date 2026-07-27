@@ -16,9 +16,11 @@ import { LARG, ALT, ALT_CANVAS, MARGEM_TOPO } from "./sprites.js";
 export const NQUADROS = 9;
 
 // janela de recorte [sx, sy, sw, sh] no sprite de origem: onde o corpo está.
+// `anda`: se a base tem ciclo de caminhada gerado. Sem ele, andar cai na
+// pose parada da direção — visível e virado certo, só sem passo.
 const BASES = {
-  masc: { win: [30, 20, 32, 52] },
-  fem:  { win: [28, 19, 32, 50] },   // caminhada ainda não gerada
+  masc: { win: [30, 20, 32, 52], anda: true },
+  fem:  { win: [28, 19, 32, 50], anda: false },   // caminhada ainda não gerada
 };
 
 // direções cujo sprite sai espelhando o lado oeste
@@ -55,12 +57,16 @@ function carregar(url) {
 
 /** Carrega tudo de uma base antes de a sala aparecer. */
 export function preaquecerChar(base) {
-  if (!BASES[base]) return Promise.resolve();
+  const cfg = BASES[base];
+  if (!cfg) return Promise.resolve();
   const urls = [];
   for (const d of TODAS) urls.push(`/sprites/chars/${base}/${d}.png`);
-  for (const d of WALK)
-    for (let i = 0; i < NQUADROS; i++)
-      urls.push(`/sprites/chars/${base}/walk/${d}/${i}.png`);
+  // Só preaquece a caminhada de quem tem: pro fem, esses arquivos não
+  // existem, e pedir os 45 só encheria o console de 404.
+  if (cfg.anda)
+    for (const d of WALK)
+      for (let i = 0; i < NQUADROS; i++)
+        urls.push(`/sprites/chars/${base}/walk/${d}/${i}.png`);
   return Promise.all(urls.map(carregar));
 }
 
@@ -89,6 +95,9 @@ export function desenharChar(ctx, base, opts = {}) {
   const cfg = BASES[base];
   if (!cfg) return true;
   const { esc = 2, dir = "south", andando = false, frame = 0, sombra = true } = opts;
+  // Base sem caminhada (fem) anda mostrando a pose parada da direção. Sem
+  // isto, `fonte` pediria walk/... que não existe e o boneco sumiria ao andar.
+  const anda = andando && cfg.anda;
 
   const L = LARG * esc;
   const A = ALT_CANVAS * esc;
@@ -105,7 +114,7 @@ export function desenharChar(ctx, base, opts = {}) {
     ctx.restore();
   }
 
-  const { url, espelha } = fonte(base, dir, andando, frame);
+  const { url, espelha } = fonte(base, dir, anda, frame);
   const img = pronta.get(url);
   if (!img) { carregar(url); return false; }
 
