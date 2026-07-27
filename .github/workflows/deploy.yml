@@ -1,0 +1,28 @@
+# Deploy automático pro Fly.io a cada push no master.
+#
+# Antes disto o deploy era na mão (`flyctl deploy`), e era fácil esquecer:
+# o push atualizava o GitHub mas o 2gether.fly.dev continuava na versão
+# velha. Agora "dar o push" já sobe pro ar.
+#
+# Precisa de um secret FLY_API_TOKEN no repositório (Settings > Secrets and
+# variables > Actions). É um token de DEPLOY, com escopo só do app 2gether —
+# não é a conta inteira do Fly.
+
+name: Deploy (Fly.io)
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    name: flyctl deploy
+    runs-on: ubuntu-latest
+    # Uma de cada vez: dois pushes juntos não devem disputar o mesmo app.
+    concurrency: deploy-2gether
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
