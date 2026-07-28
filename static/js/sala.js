@@ -9,7 +9,7 @@
 import { desenhar, canvasAvatar, LARG, ALT_CANVAS, normalizar,
          definirManifesto } from "./avatar.js";
 import { preaquecer } from "./sprites.js";
-import { preaquecerChar, direcaoDe, NQUADROS } from "./personagem.js";
+import { preaquecerChar, direcaoDe, quadrosDe } from "./personagem.js";
 import { api } from "./api.js";
 import { montarPainel } from "./editor.js";
 import { montarCenario } from "./cenario.js";
@@ -191,7 +191,9 @@ function laco(agora) {
 
     if (p.andando) {
       p.tQuadro += dt;
-      if (p.tQuadro > 0.12) { p.tQuadro = 0; p.frame = (p.frame + 1) % NQUADROS; p.sujo = true; }
+      // Cada personagem tem seu nº de quadros (masc 9, fem 6); o clássico
+      // cai no padrão. Sem isto, o fem tentaria quadros que não existe.
+      if (p.tQuadro > 0.12) { p.tQuadro = 0; p.frame = (p.frame + 1) % quadrosDe(p.avatar.base); p.sujo = true; }
     } else if (p.frame !== 0) {
       p.frame = 0; p.sujo = true;
     }

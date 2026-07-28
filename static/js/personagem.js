@@ -13,15 +13,21 @@
 
 import { LARG, ALT, ALT_CANVAS, MARGEM_TOPO } from "./sprites.js";
 
-export const NQUADROS = 9;
-
 // janela de recorte [sx, sy, sw, sh] no sprite de origem: onde o corpo está.
-// `anda`: se a base tem ciclo de caminhada gerado. Sem ele, andar cai na
-// pose parada da direção — visível e virado certo, só sem passo.
+// `anda`: se a base tem ciclo de caminhada. `quadros`: quantos frames tem esse
+// ciclo — difere por personagem (masc 9, fem 6), então não dá pra ter um número
+// global. Sem caminhada, andar cairia na pose parada (ver `anda` em desenharChar).
 const BASES = {
-  masc: { win: [30, 20, 32, 52], anda: true },
-  fem:  { win: [28, 19, 32, 50], anda: false },   // caminhada ainda não gerada
+  masc: { win: [30, 20, 32, 52], anda: true, quadros: 9 },
+  fem:  { win: [28, 19, 32, 50], anda: true, quadros: 6 },
 };
+
+/** Quantos quadros o ciclo de caminhada de uma base tem. Sem base (o boneco
+ *  clássico) mantém 9, que é o ciclo em que o "passo" do paper-doll alterna. */
+export function quadrosDe(base) {
+  const cfg = BASES[base];
+  return cfg ? cfg.quadros : 9;
+}
 
 // direções cujo sprite sai espelhando o lado oeste
 const ESPELHO = {
@@ -61,11 +67,11 @@ export function preaquecerChar(base) {
   if (!cfg) return Promise.resolve();
   const urls = [];
   for (const d of TODAS) urls.push(`/sprites/chars/${base}/${d}.png`);
-  // Só preaquece a caminhada de quem tem: pro fem, esses arquivos não
-  // existem, e pedir os 45 só encheria o console de 404.
+  // Só preaquece a caminhada de quem tem, e só os quadros que existem
+  // (masc 9, fem 6) — pedir a mais só encheria o console de 404.
   if (cfg.anda)
     for (const d of WALK)
-      for (let i = 0; i < NQUADROS; i++)
+      for (let i = 0; i < cfg.quadros; i++)
         urls.push(`/sprites/chars/${base}/walk/${d}/${i}.png`);
   return Promise.all(urls.map(carregar));
 }
@@ -79,7 +85,8 @@ function fonte(base, dir, andando, frame) {
     // parado: as 8 rotações existem de verdade, sem espelho
     return { url: `/sprites/chars/${base}/${d}.png`, espelha: false };
   }
-  const i = ((frame % NQUADROS) + NQUADROS) % NQUADROS;
+  const nq = BASES[base].quadros;
+  const i = ((frame % nq) + nq) % nq;
   return { url: `/sprites/chars/${base}/walk/${d}/${i}.png`, espelha };
 }
 

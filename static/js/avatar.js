@@ -21,9 +21,8 @@ import { ehBase, desenharChar } from "./personagem.js";
 export { LARG, ALT, ALT_CANVAS, MARGEM_TOPO };
 
 /* Personagens "base" disponíveis (sprites prontos de 8 direções). Vazio = o
-   boneco clássico paper-doll. O feminino ainda não tem ciclo de caminhada,
-   então anda mostrando a pose parada da direção (ver personagem.js) — está
-   virado pro lado certo, só sem animação de passo. */
+   boneco clássico paper-doll. Masc e fem têm ciclo de caminhada próprio (nº
+   de quadros diferente — ver personagem.js). */
 export const BASES = ["masc", "fem"];
 
 /* Ordem importa: é a ordem de desenho. */
